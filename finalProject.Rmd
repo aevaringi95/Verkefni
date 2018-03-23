@@ -1,0 +1,26 @@
+---
+title: "Final Project"
+author: "Rakel María Brynjólfsdóttir"
+date: "March 23, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd("~/Documents/Hagnýt Gagnagreining/FinalProject")
+```
+
+
+```{r}
+data = read.csv("gagnasafn_ibudarhusnaedi.csv", header  = T, sep = ";")
+#remove those that are not in capital region
+capitalArea = c(0000,1000,1100,1300,1400,1604,1606)
+data = data[data$svfn %in% capitalArea,]
+
+#remove variables we won't use
+delete = names(data)[c(1,5,6,7,10,11,12,13,14,15,17,18,20,21,25,26,38,40,41,42,44,47,50,52,53)]
+data = data[,-which(names(data) %in% delete)]
+dim(data)
+```
+

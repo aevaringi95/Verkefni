@@ -1,12 +1,11 @@
 ---
 title: "Final Project"
-author: "Ævar Ingi Jóhannesson and Rakel María Brynjólfsdóttir"
+author: "Rakel María Brynjólfsdóttir"
 date: "March 23, 2018"
 output:
   prettydoc::html_pretty:
     theme: cayman
 ---
-
 
 
 ```{r setup, include=FALSE}
@@ -15,9 +14,13 @@ rm(list = ls())
 setwd("~/Documents/Hagnýt Gagnagreining/FinalProject")
 ```
 
+```{r}
+library(plyr); library(dplyr)
+```
+
 
 ```{r}
-data = read.csv("gagnasafn_ibudarhusnaedi.csv", header  = T, sep = ";")
+data = read.csv("gagnasafn_ibudarhusnaedi.csv", header  = T, sep = ";", dec = ",")
 ```
 
 We start by removing all the data which is not in the capital region. 
@@ -29,12 +32,55 @@ data = data[data$svfn %in% capitalArea,]
 
 Now we are going to remove the variables that we won't be using
 ```{r}
-delete = names(data)[c(1,5,6,7,10,11,12,13,14,15,17,18,20,21,
+names(data)
+delete = names(data)[c(1,2,3,5,6,7,10,11,12,13,14,15,17,18,20,21,
                        25,26,38,40,41,42,44,47,50,52,53)]
 data = data[,-which(names(data) %in% delete)]
 ```
 
 ```{r}
 str(data)
+data$svfn = as.factor(data$svfn)
+data$lyfta[which(data$lyfta != 0)] = 1
+data$lyfta = as.factor(data$lyfta)
+data$svalm2 = as.numeric(data$svalm2)
+data$matssvaedi = as.factor(data$matssvaedi)
+data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
+data$ibteg = as.factor(data$ibteg)
+cor(data$ibm2,data$ntm2)
+data$ntm2 = NULL
+data$svfn = revalue(data$svfn, c("0"="Rvk","1000"="Kop","1100"="Sel","1300"="Grb","1400"="Hfj","1604"="Mos","1606"="Kjh"))
 ```
+
+Check for NA values. 
+
+```{r}
+dim(data)
+dim(na.omit(data))
+```
+
+Eigum við að hafa þessa inni?
+rfastnum: id
+kdagur: kaupdagur, ef svo hvernig eigum við að kóða hann?
+þarf að hafa bæði fjgeym og geymm2?
+þarf að hafa bæði fjbilsk og bilskurm2?
+
+Eiga eftirfarandi að vera factor eða qauantitative?
+byggar: ár byggt
+fjmib: nr of apartments in the building. 1-4
+fjhaed: number of floors in property, 1-4
+fjbilsk: number of garages, 0,1,2,3,4,8
+fjbkar: number of bathtubs,0-3
+fjsturt: 0-4,7,12
+fjklos: 0-7,12
+fjeld: 0-4,7,12
+fjherb: 0-11,13,22,24
+fjstof: 0-7,11,14
+fjgeym: 0-8
+stig10: how far property is in construction stage
+
+Annað:
+efstah: 1 if the property is on the top floor, hefur samt gidlir frá 1-13, fjöldi hæða?
+lyfta: 1 if there is elevator in the building, 0 if not, hefur samt gildi frá 0-8. Breytti þ.a. bara 0 og 1. 
+
 

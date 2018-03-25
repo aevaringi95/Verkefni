@@ -91,16 +91,11 @@ data$kdagur <- as.numeric(mydate-data$kdagur)
 str(data)
 ```
 
-
+Change byggar to how old the house is.
 ```{r}
-data$kdagur <- strptime(x = as.character(data$kdagur),
-                                format = "%d.%m.%Y")
-mydate <- as.Date("2018-04-01")
-data$kdagur <- as.Date(data$kdagur)
-
-data$kdagur <- year(data$kdagur)
-
+data$byggar <- 2018 - as.numeric(as.character(data$byggar))
 ```
+
 
 There are some observations with nuvirdi as 0. Take a closer look at them. Throw them out.
 ```{r}

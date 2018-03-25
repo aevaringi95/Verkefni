@@ -66,6 +66,7 @@ kdagur: kaupdagur, ef svo hvernig eigum við að kóða hann? Gætum mögulega b
 þarf að hafa bæði fjgeym og geymm2? Nei veljum bara annað hvort.
 þarf að hafa bæði fjbilsk og bilskurm2? Nei veljum annað hvort.
 
+Sumar gætu virkað sem factor líka held eg.
 Eiga eftirfarandi að vera factor eða qauantitative?
 byggar: ár byggt quantitative
 fjmib: nr of apartments in the building. 1-4 quantitivative

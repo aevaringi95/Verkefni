@@ -11,17 +11,24 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("~/Documents/Hagnýt Gagnagreining/FinalProject")
 ```
 
 ```{r}
-library(plyr); library(dplyr)
+library(plyr); library(dplyr); library(lubridate)
 ```
 
 
 ```{r}
-data = read.csv("gagnasafn_ibudarhusnaedi.csv", header  = T, sep = ";", dec = ",")
+data = read.csv("gagnasafn_ibudarhusnaedi.csv",
+                header  = T,
+                sep = ";",
+                dec = ",")
+
+
 ```
+
+
+###Data preprocessing
 
 We start by removing all the data which is not in the capital region. 
 
@@ -33,23 +40,59 @@ data = data[data$svfn %in% capitalArea,]
 Now we are going to remove the variables that we won't be using
 ```{r}
 names(data)
-delete = names(data)[c(1,2,3,5,6,7,10,11,12,13,14,15,17,18,20,21,
-                       25,26,38,40,41,42,44,47,50,52,53)]
+delete = names(data)[c(1,2,5,6,7,10,11,12,13,14,15,17,18,19,20,21,
+                       25,26,30,37,38,40,41,42,44,47,50,52,53)]
 data = data[,-which(names(data) %in% delete)]
 ```
 
+
+Change some variables to factors.
 ```{r}
 str(data)
 data$svfn = as.factor(data$svfn)
 data$lyfta[which(data$lyfta != 0)] = 1
 data$lyfta = as.factor(data$lyfta)
+data$fjsturt[which(data$fjsturt != c(0,1))] = 2
+data$fjsturt = as.factor(data$fjsturt)
+data$fjklos[which(data$fjklos != c(0,1))] = 2
+data$fjklos = as.factor(data$fjklos)
+data$fjbkar[which(data$fjbkar != c(0,1))] = 2
+data$fjbkar = as.factor(data$fjbkar)
+data$fjeld[which(data$fjeld != c(0,1))] = 2
+data$fjeld = as.factor(data$fjeld)
+data$fjstof[which(data$fjstof != c(0,1))] = 2
+data$fjstof = as.factor(data$fjstof)
+data$fjhaed = as.factor(data$fjhaed)
 data$svalm2 = as.numeric(data$svalm2)
 data$matssvaedi = as.factor(data$matssvaedi)
 data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
+data$fjmib = as.factor(data$fjmib)
+data$fjherb= as.numeric(data$fjherb)
 data$ibteg = as.factor(data$ibteg)
-cor(data$ibm2,data$ntm2)
-data$ntm2 = NULL
+cor(data$ibm2,data$ntm2) #Highly correlated 
+data$ntm2 = NULL #Throw out ntm2
 data$svfn = revalue(data$svfn, c("0"="Rvk","1000"="Kop","1100"="Sel","1300"="Grb","1400"="Hfj","1604"="Mos","1606"="Kjh"))
+```
+
+Working with kdagur variable. Change it into days since the property was last bought. (Veit ekki alveg hvort við eigum að hafa þetta bara arið eða daga fjöldan. )
+
+```{r}
+data$kdagur <- strptime(x = as.character(data$kdagur),
+                                format = "%d.%m.%Y")
+mydate <- as.Date("2018-04-01")
+data$kdagur <- as.Date(data$kdagur)
+data$kdagur <- as.numeric(mydate-data$kdagur)
+str(data)
+```
+
+```{r}
+data$kdagur <- strptime(x = as.character(data$kdagur),
+                                format = "%d.%m.%Y")
+mydate <- as.Date("2018-04-01")
+data$kdagur <- as.Date(data$kdagur)
+
+data$kdagur <- year(data$kdagur)
+
 ```
 
 Check for NA values. 
@@ -57,32 +100,68 @@ Check for NA values.
 ```{r}
 dim(data)
 dim(na.omit(data))
+
+```
+
+
+
+
+### Descriptive plots of the data
+
+
+Plotting Nuvirdi against some variables.
+```{r}
+
+
+p1 <- ggplot(data, aes(x=factor(kdagur),y=log(nuvirdi))) +
+          geom_boxplot()+
+          theme_grey()
+
+p2 <- ggplot(data, aes(x=stig10,y=nuvirdi)) +
+          geom_point() +
+          theme_grey( )
+
+
+p3 <- ggplot(data, aes(x=log(bilskurm2),y=log(nuvirdi))) +
+          geom_point() +
+          theme_grey( )
+p1
+p2
+p3
 ```
 
 
 Eigum við að hafa þessa inni?
-rfastnum: id... neei held það þurfi ekki.
-kdagur: kaupdagur, ef svo hvernig eigum við að kóða hann? Gætum mögulega breytt þessu i daga siðan hun var keypt. Þ.e.a.s festum bara dagsetningu t.d 1.april og latum hann reikna fjölda daga siðan hun var keypt.
-þarf að hafa bæði fjgeym og geymm2? Nei veljum bara annað hvort.
-þarf að hafa bæði fjbilsk og bilskurm2? Nei veljum annað hvort.
 
-Sumar gætu virkað sem factor líka held eg.
 Eiga eftirfarandi að vera factor eða qauantitative?
 byggar: ár byggt quantitative
 fjmib: nr of apartments in the building. 1-4 quantitivative
 fjhaed: number of floors in property, 1-4 quantitative
 fjbilsk: number of garages, 0,1,2,3,4,8  quantitative.
 fjbkar: number of bathtubs,0-3 quantitative
-fjsturt: 0-4,7,12 quantitative
-fjklos: 0-7,12 quantitative
-fjeld: 0-4,7,12 quantitative
+fjsturt: 0-4,7,12 quantitative: Factor 0,1,2
+fjklos: 0-7,12 quantitative: Factor 0,1,2
+fjeld: 0-4,7,12 quantitative: Factor 0,1,2
 fjherb: 0-11,13,22,24 quantitative
 fjstof: 0-7,11,14 quantitative
 fjgeym: 0-8 quantitative
-stig10: how far property is in construction stage quantitiative.
+stig10: how far property is in construction stage quantitiative.  Mögulega breyta ´ýr tilbuið eða ekki??
+
 
 Annað:
 efstah: 1 if the property is on the top floor, hefur samt gidlir frá 1-13, fjöldi hæða? Jaa mjög spes. Mögulega breyta öllu yfir 1 ´í 1.
 lyfta: 1 if there is elevator in the building, 0 if not, hefur samt gildi frá 0-8. Breytti þ.a. bara 0 og 1. 
+
+Breytingar:
+Ég breytti kaupdagur i variable þannig að það reiknar fjölda daga fra þvi það var keypt(dagsetningin i kdagur) til 1 april 2018. Veit ekki alveg hvaða seinni dagsetningu við eigum að nota. Mögulegar reyna að finna ´út dagsetninguna sem þetta var gefið ´út.
+
+Eg tok ut fjölda bilskura og fjölda geymslna og hafði fermetra inni i staðin. Einnig breytti eg öllum þessum fjölda breytum ´í factor með 0,1,2. 0 þyðir ekkert, 1 þyðir 1 og 2 þyðir meira en 1.
+
+eg tok lika ut efstah.. Við vitum ekki alveg hvað þetta þýðir að hafa þetta yfir 1 svo eg þori varla að nota það. Nema við komumst að þvi hvað það þyðir.
+
+Endilega skoðaðu str(data) Til að sja allar breytingarnar sem eg gerði. 
+
+Bj
+
 
 

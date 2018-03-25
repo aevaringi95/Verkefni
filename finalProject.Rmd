@@ -15,6 +15,9 @@ rm(list = ls())
 
 ```{r}
 library(plyr); library(dplyr); library(lubridate)
+library(ggplot2)
+library(grid)
+library(gridExtra)
 ```
 
 
@@ -41,7 +44,7 @@ Now we are going to remove the variables that we won't be using
 ```{r}
 names(data)
 delete = names(data)[c(1,2,5,6,7,10,11,12,13,14,15,17,18,19,20,21,
-                       25,26,30,37,38,40,41,42,44,47,50,52,53)]
+                       25,26,37,38,40,41,42,43,44,47,50,52,53)]
 data = data[,-which(names(data) %in% delete)]
 ```
 
@@ -52,22 +55,25 @@ str(data)
 data$svfn = as.factor(data$svfn)
 data$lyfta[which(data$lyfta != 0)] = 1
 data$lyfta = as.factor(data$lyfta)
-data$fjsturt[which(data$fjsturt != c(0,1))] = 2
+data$fjsturt[which(!(data$fjsturt %in% c(0,1)))] = 2
 data$fjsturt = as.factor(data$fjsturt)
-data$fjklos[which(data$fjklos != c(0,1))] = 2
+data$fjklos[which(!(data$fjklos %in% c(0,1)))] = 2
 data$fjklos = as.factor(data$fjklos)
-data$fjbkar[which(data$fjbkar != c(0,1))] = 2
+data$fjbkar[which(!(data$fjbkar %in% c(0,1)))] = 2
 data$fjbkar = as.factor(data$fjbkar)
-data$fjeld[which(data$fjeld != c(0,1))] = 2
+data$fjeld[which(!(data$fjeld %in% c(0,1)))] = 2
 data$fjeld = as.factor(data$fjeld)
-data$fjstof[which(data$fjstof != c(0,1))] = 2
+data$fjstof[which(!(data$fjstof %in% c(0,1)))] = 2
 data$fjstof = as.factor(data$fjstof)
+data$fjbilsk[which(data$fjbilsk != 0)] = 1
+data$fjbilsk = as.factor(data$fjbilsk)
 data$fjhaed = as.factor(data$fjhaed)
+data$fjherb[which(!(data$fjherb %in% c(0,1,2,3,4,5)))] = 6
+data$fjherb = as.factor(data$fjherb)
 data$svalm2 = as.numeric(data$svalm2)
 data$matssvaedi = as.factor(data$matssvaedi)
 data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
 data$fjmib = as.factor(data$fjmib)
-data$fjherb= as.numeric(data$fjherb)
 data$ibteg = as.factor(data$ibteg)
 cor(data$ibm2,data$ntm2) #Highly correlated 
 data$ntm2 = NULL #Throw out ntm2
@@ -85,6 +91,7 @@ data$kdagur <- as.numeric(mydate-data$kdagur)
 str(data)
 ```
 
+
 ```{r}
 data$kdagur <- strptime(x = as.character(data$kdagur),
                                 format = "%d.%m.%Y")
@@ -95,6 +102,14 @@ data$kdagur <- year(data$kdagur)
 
 ```
 
+There are some observations with nuvirdi as 0. Take a closer look at them. Throw them out.
+```{r}
+noNuvirdi <- which(data$nuvirdi==0)
+data = data[-noNuvirdi,]
+```
+
+
+
 Check for NA values. 
 
 ```{r}
@@ -103,37 +118,118 @@ dim(na.omit(data))
 
 ```
 
+Correlation between variables.
+```{r}
+cor(log(data$nuvirdi),log(data$svalm2))
+cor(log(data$nuvirdi),data$kdagur)
 
 
+```
 
 ### Descriptive plots of the data
 
 
-Plotting Nuvirdi against some variables.
+Here we look at the density of the Nuvirdi function. When we log scale it it looks a lot more like normal density.
 ```{r}
+density1 <- ggplot(data,aes(nuvirdi))+
+  geom_density()
 
 
-p1 <- ggplot(data, aes(x=factor(kdagur),y=log(nuvirdi))) +
-          geom_boxplot()+
+density2 <- ggplot(data,aes(log(nuvirdi)))+
+  geom_density()
+
+grid.arrange(density1,density2,nrow=2)
+
+```
+
+
+
+Plotting Nuvirdi against some variables. (skoda fleiri)
+
+```{r}
+p1 <- ggplot(data, aes(x=kdagur,y=log(nuvirdi))) +
+          geom_point()+
           theme_grey()
 
 p2 <- ggplot(data, aes(x=stig10,y=nuvirdi)) +
           geom_point() +
-          theme_grey( )
+          theme_grey()
 
 
-p3 <- ggplot(data, aes(x=log(bilskurm2),y=log(nuvirdi))) +
-          geom_point() +
-          theme_grey( )
-p1
-p2
-p3
+grid.arrange(p1,p2,
+             nrow=1)
+
+
+
 ```
 
 
-Eigum við að hafa þessa inni?
+Plot against fjoldi variables. (Breyta nöfnum a asum)
+```{r}
 
-Eiga eftirfarandi að vera factor eða qauantitative?
+f1 <- ggplot(data,aes(x=fjbilsk,y=log(nuvirdi)))+
+          geom_boxplot()
+
+f2 <- ggplot(data,aes(x=fjsturt,y=log(nuvirdi)))+
+          geom_boxplot()
+
+f3 <- ggplot(data,aes(x=fjbkar,y=log(nuvirdi)))+
+          geom_boxplot()
+
+
+f4 <- ggplot(data,aes(x=fjeld,y=log(nuvirdi)))+
+          geom_boxplot()
+
+f5 <- ggplot(data,aes(x=fjklos,y=log(nuvirdi)))+
+          geom_boxplot()
+
+f6 <- ggplot(data,aes(x=fjherb,y=log(nuvirdi)))+
+          geom_boxplot()
+
+f7 <- ggplot(data, aes(x=fjhaed,y=log(nuvirdi))) +
+          geom_boxplot()
+
+f8 <- ggplot(data, aes(x=fjstof,y=log(nuvirdi))) +
+          geom_boxplot()
+
+
+
+grid.arrange(f1,f2,
+             f3,f4,
+             f5,f6,
+             f7,f8,ncol=3)
+
+```
+
+
+We also wan't to transform ibm2 to log scale as we can see from the plots below.
+```{r}
+corr1 <- ggplot(data,aes(x=ibm2,y=nuvirdi))+
+                  geom_point()
+
+
+corr2 <- ggplot(data,aes(x=ibm2,y=log(nuvirdi)))+
+                  geom_point()
+
+
+corr3 <- ggplot(data,aes(x=log(ibm2),y=log(nuvirdi)))+
+                  geom_point()
+
+
+grid.arrange(corr1,corr2,
+             corr3,nrow=2)
+```
+
+```{r}
+ggplot(data,aes(x=ummal,y=nuvirdi))+
+  geom_point()
+
+```
+
+
+
+
+
 byggar: ár byggt quantitative
 fjmib: nr of apartments in the building. 1-4 quantitivative
 fjhaed: number of floors in property, 1-4 quantitative
@@ -161,7 +257,9 @@ eg tok lika ut efstah.. Við vitum ekki alveg hvað þetta þýðir að hafa þe
 
 Endilega skoðaðu str(data) Til að sja allar breytingarnar sem eg gerði. 
 
-Bj
+Svo er greinilega gott að hafa núvirði á log skalanum og líklegast eitthvað af þessum numerical breytum einnig. Þurfum líka að breyta byggar held eg... Mögulega skipta þvi uppi timabil bara, eldri en 1900,1900-1950,1950-1980 eða eitthvað þannig.
 
+
+Svo var eg að reyna að teikna eitthvað af þessum breytum upp.. mögulega hendum við fleiri breytum ut.
 
 

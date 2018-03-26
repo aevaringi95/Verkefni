@@ -80,13 +80,7 @@ data$ntm2 = NULL #Throw out ntm2
 data$svfn = revalue(data$svfn, c("0"="Rvk","1000"="Kop","1100"="Sel","1300"="Grb","1400"="Hfj","1604"="Mos","1606"="Kjh"))
 ```
 
-log transforms
 
-```{r}
-data$nuvirdi = log(data$nuvirdi)
-data$ibm2 = log(data$ibm2)
-data$geymm2 = log(data$geymm2)
-```
 
 Working with kdagur variable. Change it into days since the property was last bought. (Veit ekki alveg hvort við eigum að hafa þetta bara arið eða daga fjöldan. )
 
@@ -112,22 +106,17 @@ noNuvirdi <- which(data$nuvirdi==0)
 data = data[-noNuvirdi,]
 ```
 
-
-
 Check for NA values. 
 
 ```{r}
 dim(data)
 dim(na.omit(data))
-
 ```
 
 Correlation between variables.
 ```{r}
 cor(log(data$nuvirdi),log(data$svalm2))
 cor(log(data$nuvirdi),data$kdagur)
-
-
 ```
 
 ### Descriptive plots of the data
@@ -143,10 +132,7 @@ density2 <- ggplot(data,aes(log(nuvirdi)))+
   geom_density()
 
 grid.arrange(density1,density2,nrow=2)
-
 ```
-
-
 
 Plotting Nuvirdi against some variables. (skoda fleiri)
 
@@ -162,9 +148,6 @@ p2 <- ggplot(data, aes(x=stig10,y=nuvirdi)) +
 
 grid.arrange(p1,p2,
              nrow=1)
-
-
-
 ```
 
 
@@ -196,13 +179,10 @@ f7 <- ggplot(data, aes(x=fjhaed,y=log(nuvirdi))) +
 f8 <- ggplot(data, aes(x=fjstof,y=log(nuvirdi))) +
           geom_boxplot()
 
-
-
 grid.arrange(f1,f2,
              f3,f4,
              f5,f6,
              f7,f8,ncol=3)
-
 ```
 
 
@@ -224,15 +204,18 @@ grid.arrange(corr1,corr2,
              corr3,nrow=2)
 ```
 
+log transforms
+
+```{r}
+data$nuvirdi = log(data$nuvirdi)
+data$ibm2 = log(data$ibm2)
+data$geymm2 = log(data$geymm2)
+```
+
 ```{r}
 ggplot(data,aes(x=ummal,y=nuvirdi))+
   geom_point()
-
 ```
-
-
-
-
 
 byggar: ár byggt quantitative
 fjmib: nr of apartments in the building. 1-4 quantitivative
@@ -245,25 +228,7 @@ fjeld: 0-4,7,12 quantitative: Factor 0,1,2
 fjherb: 0-11,13,22,24 quantitative
 fjstof: 0-7,11,14 quantitative
 fjgeym: 0-8 quantitative
-stig10: how far property is in construction stage quantitiative.  Mögulega breyta ´ýr tilbuið eða ekki??
+stig10: how far property is in construction stage quantitiative. 
 
-
-Annað:
-efstah: 1 if the property is on the top floor, hefur samt gidlir frá 1-13, fjöldi hæða? Jaa mjög spes. Mögulega breyta öllu yfir 1 ´í 1.
-lyfta: 1 if there is elevator in the building, 0 if not, hefur samt gildi frá 0-8. Breytti þ.a. bara 0 og 1. 
-
-Breytingar:
-Ég breytti kaupdagur i variable þannig að það reiknar fjölda daga fra þvi það var keypt(dagsetningin i kdagur) til 1 april 2018. Veit ekki alveg hvaða seinni dagsetningu við eigum að nota. Mögulegar reyna að finna ´út dagsetninguna sem þetta var gefið ´út.
-
-Eg tok ut fjölda bilskura og fjölda geymslna og hafði fermetra inni i staðin. Einnig breytti eg öllum þessum fjölda breytum ´í factor með 0,1,2. 0 þyðir ekkert, 1 þyðir 1 og 2 þyðir meira en 1.
-
-eg tok lika ut efstah.. Við vitum ekki alveg hvað þetta þýðir að hafa þetta yfir 1 svo eg þori varla að nota það. Nema við komumst að þvi hvað það þyðir.
-
-Endilega skoðaðu str(data) Til að sja allar breytingarnar sem eg gerði. 
-
-Svo er greinilega gott að hafa núvirði á log skalanum og líklegast eitthvað af þessum numerical breytum einnig. Þurfum líka að breyta byggar held eg... Mögulega skipta þvi uppi timabil bara, eldri en 1900,1900-1950,1950-1980 eða eitthvað þannig.
-
-
-Svo var eg að reyna að teikna eitthvað af þessum breytum upp.. mögulega hendum við fleiri breytum ut.
 
 

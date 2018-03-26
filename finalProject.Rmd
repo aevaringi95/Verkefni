@@ -7,7 +7,6 @@ output:
     theme: cayman
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
@@ -20,14 +19,13 @@ library(grid)
 library(gridExtra)
 ```
 
-
 ```{r}
-data = read.csv("gagnasafn_ibudarhusnaedi.csv",
+dataO = read.csv("gagnasafn_ibudarhusnaedi.csv",
                 header  = T,
                 sep = ";",
                 dec = ",")
+data = dataO #svo ég þurfi ekki að keyra allt aftur, hendum þessu út seinna
 ```
-
 
 ###Data preprocessing
 
@@ -38,16 +36,35 @@ capitalArea = c(0000,1000,1100,1300,1400,1604,1606)
 data = data[data$svfn %in% capitalArea,]
 ```
 
-Now we are going to remove the variables that we won't be using
+Now we are going to remove the variables that we won't be using.
+
 ```{r}
-names(data)
 delete = names(data)[c(1,2,5,6,7,10,11,12,13,14,15,17,18,19,20,21,
-                       25,26,37,38,40,41,42,43,44,47,50,52,53)]
+                       25,26,30,37,38,40,41,42,44,47,50,52,53)]
 data = data[,-which(names(data) %in% delete)]
 ```
 
+Some variable have many levels and few observations on some levels so we are going to remove those observations. 
 
-Change some variables to factors.
+```{r}
+#Einbylishus, Fjolbylishus, Ibudareign, Ibudarhus, Parhus, Radhus. Getum fækkað meira 
+lev = levels(data$teg_eign)[c(1,2,7,8,10,11)] 
+data = data[which(data$teg_eign %in% lev),]
+data$teg_eign = droplevels(data$teg_eign)
+
+data$matssvaedi = as.factor(data$matssvaedi)
+lev = levels(data$matssvaedi)[c(61,62)]
+data = data[-which(data$matssvaedi %in% lev),]
+data$matssvaedi = droplevels(data$matssvaedi)
+
+data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
+lev = levels(data$undirmatssvaedi)[c(10,36,38,39,50,55)]
+data = data[-which(data$undirmatssvaedi %in% lev),]
+data$undirmatssvaedi = droplevels(data$undirmatssvaedi)
+```
+
+Many of the numerical variables should be factors, and some factors should be numerical. We are also going to combine some of the levels for certain factors since the higher levels have very few observations in many cases.
+
 ```{r}
 data$svfn = as.factor(data$svfn)
 data$lyfta[which(data$lyfta != 0)] = 1
@@ -62,24 +79,20 @@ data$fjeld[which(!(data$fjeld %in% c(0,1)))] = 2
 data$fjeld = as.factor(data$fjeld)
 data$fjstof[which(!(data$fjstof %in% c(0,1)))] = 2
 data$fjstof = as.factor(data$fjstof)
-data$fjbilsk[which(data$fjbilsk != 0)] = 1
-data$fjbilsk = as.factor(data$fjbilsk)
 data$fjhaed = as.factor(data$fjhaed)
 data$fjherb[which(!(data$fjherb %in% c(0,1,2,3,4,5)))] = 6
 data$fjherb = as.factor(data$fjherb)
 data$svalm2 = as.numeric(data$svalm2)
-data$matssvaedi = as.factor(data$matssvaedi)
-data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
 data$fjmib = as.factor(data$fjmib)
 data$ibteg = as.factor(data$ibteg)
-cor(data$ibm2,data$ntm2) #Highly correlated 
-data$ntm2 = NULL #Throw out ntm2
-data$svfn = revalue(data$svfn, c("0"="Rvk","1000"="Kop","1100"="Sel","1300"="Grb","1400"="Hfj","1604"="Mos","1606"="Kjh"))
+data$svfn = revalue(data$svfn, c("0"="Rvk","1000"="Kop",
+                                 "1100"="Sel","1300"="Grb",
+                                 "1400"="Hfj","1604"="Mos"))
+data$ibteg = revalue(data$ibteg, c("11"="1","12"="2"))
+data$byggar = droplevels(data$byggar)
 ```
 
-
-
-Working with kdagur variable. Change it into days since the property was last bought. (Veit ekki alveg hvort við eigum að hafa þetta bara arið eða daga fjöldan. )
+We are going to change the kdagur variable so that we have the days since the property was bought. 
 
 ```{r}
 data$kdagur <- strptime(x = as.character(data$kdagur),
@@ -89,32 +102,31 @@ data$kdagur <- as.Date(data$kdagur)
 data$kdagur <- as.numeric(mydate-data$kdagur)
 ```
 
-Change byggar to how old the house is.
+And we're going to change the byggar variable into the age of the house in years. 
+
 ```{r}
 data$byggar <- 2018 - as.numeric(as.character(data$byggar))
 colnames(data)[5] = "aldur"
 ```
 
-
-There are some observations with nuvirdi as 0. Take a closer look at them. Throw them out.
+Now we remove 0 values for nuvirdi and check for NA values. 
 ```{r}
 noNuvirdi <- which(data$nuvirdi==0)
 data = data[-noNuvirdi,]
+dim(data) == dim(na.omit(data))
 ```
 
-Check for NA values. 
+Now we'll check whether any of the numerical variables are highly correlated. 
 
 ```{r}
-dim(data)
-dim(na.omit(data))
-```
-
-Correlation between variables.
-```{r}
-str(data)
-#numerical variables
-X = with(data,cbind(kdagur,nuvirdi,aldur,ummal,ibm2,stig10,svalm2,geymm2))
+X = with(data,cbind(kdagur,aldur,ummal,ibm2,stig10,bilskurm2,svalm2,geymm2))
 cor(X)
+```
+
+The ibm2 and ntm2 have a very high correlation so I'm removing one of them. 
+
+```{r}
+data$ntm2 = NULL 
 ```
 
 ### Descriptive plots of the data
@@ -125,111 +137,180 @@ Here we look at the density of the Nuvirdi function. When we log scale it it loo
 density1 <- ggplot(data,aes(nuvirdi))+
   geom_density()
 
-
 density2 <- ggplot(data,aes(log(nuvirdi)))+
   geom_density()
 
 grid.arrange(density1,density2,nrow=2)
+data$nuvirdi = log(data$nuvirdi)
 ```
 
-Plotting Nuvirdi against some variables. (skoda fleiri)
+Let's plot nuvirdi against some variables. 
 
 ```{r}
-p1 <- ggplot(data, aes(x=kdagur,y=log(nuvirdi))) +
-          geom_point()+
+p1 <- ggplot(data, aes(x=kdagur,y=nuvirdi)) +
+          geom_point(size=0.5)+
           theme_grey()
 
 p2 <- ggplot(data, aes(x=stig10,y=nuvirdi)) +
-          geom_point() +
+          geom_point(size=0.5) +
           theme_grey()
 
+p3 <- ggplot(data, aes(x=geymm2,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey()
 
-grid.arrange(p1,p2,
-             nrow=1)
+p4 <- ggplot(data, aes(x=ummal,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey()
+
+p5 <- ggplot(data, aes(x=aldur,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey()
+
+p6 <- ggplot(data, aes(x=bilskurm2,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey()
+
+p7 <- ggplot(data, aes(x=svalm2,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey()
+
+p8 <- ggplot(data, aes(x=ibm2,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey()
+
+grid.arrange(p1,p2,p3,p4,nrow = 2)
+grid.arrange(p5,p6,p7,p8,nrow = 2)
 ```
 
-
-Plot against fjoldi variables. (Breyta nöfnum a asum)
-```{r}
-
-f1 <- ggplot(data,aes(x=fjbilsk,y=log(nuvirdi)))+
-          geom_boxplot()
-
-f2 <- ggplot(data,aes(x=fjsturt,y=log(nuvirdi)))+
-          geom_boxplot()
-
-f3 <- ggplot(data,aes(x=fjbkar,y=log(nuvirdi)))+
-          geom_boxplot()
-
-
-f4 <- ggplot(data,aes(x=fjeld,y=log(nuvirdi)))+
-          geom_boxplot()
-
-f5 <- ggplot(data,aes(x=fjklos,y=log(nuvirdi)))+
-          geom_boxplot()
-
-f6 <- ggplot(data,aes(x=fjherb,y=log(nuvirdi)))+
-          geom_boxplot()
-
-f7 <- ggplot(data, aes(x=fjhaed,y=log(nuvirdi))) +
-          geom_boxplot()
-
-f8 <- ggplot(data, aes(x=fjstof,y=log(nuvirdi))) +
-          geom_boxplot()
-
-grid.arrange(f1,f2,
-             f3,f4,
-             f5,f6,
-             f7,f8,ncol=3)
-```
-
-
-We also wan't to transform ibm2 to log scale as we can see from the plots below.
-```{r}
-corr1 <- ggplot(data,aes(x=ibm2,y=nuvirdi))+
-                  geom_point()
-
-
-corr2 <- ggplot(data,aes(x=ibm2,y=log(nuvirdi)))+
-                  geom_point()
-
-
-corr3 <- ggplot(data,aes(x=log(ibm2),y=log(nuvirdi)))+
-                  geom_point()
-
-
-grid.arrange(corr1,corr2,
-             corr3,nrow=2)
-```
-
-log transforms
+Let's plot geymm2, bilskurm2 and ibm2 with log transformations. 
 
 ```{r}
-data$nuvirdi = log(data$nuvirdi)
-data$ibm2 = log(data$ibm2)
-data$geymm2 = log(data$geymm2)
+B = data$bilskurm2
+ind1 = which(B == 0)
+B[-ind1] = log(B[-ind1])
+I = log(data$ibm2)
+G = data$geymm2
+ind3 = which(G == 0)
+G[-ind3] = log(G[-ind3])
 ```
 
 ```{r}
-ggplot(data,aes(x=ummal,y=nuvirdi))+
-  geom_point()
+p1 <- ggplot(data, aes(x=B,y=nuvirdi)) +
+          geom_point(size=0.5)+
+          theme_grey() + labs(x="bilskurm2")
 
+p2 <- ggplot(data, aes(x=I,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey() + labs(x="ibm2")
+
+p3 <- ggplot(data, aes(x=G,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey() + labs(x="geymm2")
+
+grid.arrange(p1,p2,p3,nrow = 2)
+```
+
+A log transformation is not suitable for the bilkskurm2 variable, but it definitely is for ibm2 and geymm2, although we will have to fix the values that are at zero. 
+
+```{r}
+data$ibm2 = log(data$ibm)
+
+G[ind3] = G[ind3] - 1.8 #veit ekki hvort þetta sé góð lausn en gerði svipað í bayes
+data$geymm2 = G
+ggplot(data, aes(x=geymm2,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey() 
+```
+
+
+Now we'll make some box plots of the factor variables. 
+
+```{r}
+f1 <- ggplot(data,aes(x=teg_eign,y=nuvirdi))+
+          geom_boxplot()
+
+f2 <- ggplot(data,aes(x=svfn,y=nuvirdi))+
+          geom_boxplot()
+
+f3 <- ggplot(data,aes(x=fjmib,y=nuvirdi))+
+          geom_boxplot()
+
+f4 <- ggplot(data,aes(x=lyfta,y=nuvirdi))+
+          geom_boxplot()
+
+f5 <- ggplot(data, aes(x=fjhaed,y=nuvirdi)) +
+          geom_boxplot()
+
+f6 <- ggplot(data,aes(x=fjbkar,y=nuvirdi))+
+          geom_boxplot()
+
+f7 <- ggplot(data,aes(x=fjsturt,y=nuvirdi))+
+          geom_boxplot()
+
+f8 <- ggplot(data,aes(x=fjklos,y=nuvirdi))+
+          geom_boxplot()
+
+f9 <- ggplot(data,aes(x=fjeld,y=nuvirdi))+
+          geom_boxplot()
+
+f10 <- ggplot(data,aes(x=fjherb,y=nuvirdi))+
+          geom_boxplot()
+
+f11 <- ggplot(data, aes(x=fjstof,y=nuvirdi)) +
+          geom_boxplot()
+
+f12 <- ggplot(data, aes(x=ibteg,y=nuvirdi)) +
+          geom_boxplot()
+
+grid.arrange(f1,f2,f3,
+             f4,f5,
+             f6,f7,
+             f8,f9,f10,f11,f12,ncol=3)
+```
+
+Now that we are happy with the data we'll check the correlation again. 
+
+```{r}
+X = with(data,cbind(kdagur,aldur,ummal,ibm2,stig10,bilskurm2,svalm2,geymm2))
+cor(X)
+```
+
+Now the data is as follows: 
+
+  Variable      | Description
+--------------- | -----------
+kdagur          | days since property was bought
+nuvirdi         | current price
+teg_eign        | type of property (6 levels)
+svfn            | town id (6 levels)
+aldur           | age of house
+fjmib           | number of apartments in building (4 levels)
+lyfta           | whether house has elevator or not (2 levels)
+ummal           | circumference of property 
+ibm2            | area of property
+ntm2            | netto area of property
+fjhaed          | number of floors in building (4 levels)
+fjbkar          | number of bathtubs (3 levels)
+fjsturt         | number of showers (3 levels)
+fjklos          | number of toilets (3 levels)
+fjeld           | number of kitchens (3 levels)
+fjherb          | number of rooms (7 levels)
+fjstof          | number of livingrooms (3 levels)
+stig10          | construction stage 
+bilskurm2       | area of garage
+svalm2          | area of balcony
+geymm2          | area of storage space 
+matssvaedi      | location (60 levels)
+undirmatssvaedi | sub-location (63 levels)
+ibteg           | type of property (2 levels)
+
+```{r}
 str(data)
-table(data$teg_eign)
+fit = lm(nuvirdi~.,data)
+summary(fit)
+#fjbkar insignificant
+write.csv(data, file = "MyData.csv")
 ```
-
-byggar: ár byggt quantitative
-fjmib: nr of apartments in the building. 1-4 quantitivative
-fjhaed: number of floors in property, 1-4 quantitative
-fjbilsk: number of garages, 0,1,2,3,4,8  quantitative.
-fjbkar: number of bathtubs,0-3 quantitative
-fjsturt: 0-4,7,12 quantitative: Factor 0,1,2
-fjklos: 0-7,12 quantitative: Factor 0,1,2
-fjeld: 0-4,7,12 quantitative: Factor 0,1,2
-fjherb: 0-11,13,22,24 quantitative
-fjstof: 0-7,11,14 quantitative
-fjgeym: 0-8 quantitative
-stig10: how far property is in construction stage quantitiative. 
-
 
 

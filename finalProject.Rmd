@@ -94,6 +94,7 @@ str(data)
 Change byggar to how old the house is.
 ```{r}
 data$byggar <- 2018 - as.numeric(as.character(data$byggar))
+colnames(data)[5] = "aldur"
 ```
 
 

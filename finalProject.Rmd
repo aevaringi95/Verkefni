@@ -80,6 +80,14 @@ data$ntm2 = NULL #Throw out ntm2
 data$svfn = revalue(data$svfn, c("0"="Rvk","1000"="Kop","1100"="Sel","1300"="Grb","1400"="Hfj","1604"="Mos","1606"="Kjh"))
 ```
 
+log transforms
+
+```{r}
+data$nuvirdi = log(data$nuvirdi)
+data$ibm2 = log(data$ibm2)
+data$geymm2 = log(data$geymm2)
+```
+
 Working with kdagur variable. Change it into days since the property was last bought. (Veit ekki alveg hvort við eigum að hafa þetta bara arið eða daga fjöldan. )
 
 ```{r}

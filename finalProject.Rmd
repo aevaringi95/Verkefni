@@ -17,6 +17,7 @@ library(plyr); library(dplyr); library(lubridate)
 library(ggplot2)
 library(grid)
 library(gridExtra)
+library(glmnet)
 ```
 
 ```{r}
@@ -281,14 +282,14 @@ Now the data is as follows:
   Variable      | Description
 --------------- | -----------
 kdagur          | days since property was bought
-nuvirdi         | current price
+nuvirdi         | log of current price
 teg_eign        | type of property (6 levels)
 svfn            | town id (6 levels)
 aldur           | age of house
 fjmib           | number of apartments in building (4 levels)
 lyfta           | whether house has elevator or not (2 levels)
 ummal           | circumference of property 
-ibm2            | area of property
+ibm2            | log of area of property
 ntm2            | netto area of property
 fjhaed          | number of floors in building (4 levels)
 fjbkar          | number of bathtubs (3 levels)
@@ -300,17 +301,79 @@ fjstof          | number of livingrooms (3 levels)
 stig10          | construction stage 
 bilskurm2       | area of garage
 svalm2          | area of balcony
-geymm2          | area of storage space 
+geymm2          | log of area of storage space 
 matssvaedi      | location (60 levels)
 undirmatssvaedi | sub-location (63 levels)
 ibteg           | type of property (2 levels)
 
 ```{r}
-str(data)
-fit = lm(nuvirdi~.,data)
-summary(fit)
-#fjbkar insignificant
-write.csv(data, file = "MyData.csv")
+write.csv(data, file = "MyData.csv",row.names = F)
 ```
+
+Jesús, write.csv viðheldur ekki hvaða breytur eru factor og hverjar eru numerical. Þurfum að finna útúr þessu. 
+
+```{r}
+rm(list = ls())
+#dat = read.csv("MyData.csv")
+set.seed(8756)
+dat = data
+n = dim(dat)[1]
+train = sample(n,floor(n*0.8)) #getum haft eitthvað annað split
+dat.train = dat[train,]
+dat.test = dat[-train,]
+```
+
+## Linear Regression
+Getum gert einhverja aðra aðferð, vildi bara prófa. 
+
+```{r}
+fit.lm = lm(nuvirdi~.,dat.train)
+summary(fit.lm)
+pred.lm = predict(fit.lm, dat.test)
+```
+
+
+## Lasso Regression
+
+kannski gera best subset selection. 
+
+```{r}
+ytrain = data.matrix(dat.train[,"nuvirdi"])
+Xtrain = data.matrix(dat.train[,!(colnames(dat.train) %in% c("nuvirdi"))])
+Xtrain
+fit.lasso = cv.glmnet(Xtrain,ytrain)
+plot(fit.lasso)
+best.lambda = fit.lasso$lambda.min
+pred.lasso = predict(fit.lasso,dat.test)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

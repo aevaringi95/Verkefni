@@ -49,7 +49,7 @@ Some variable have many levels and few observations on some levels so we are goi
 
 ```{r}
 #Einbylishus, Fjolbylishus, Ibudareign, Ibudarhus, Parhus, Radhus. Getum fækkað meira 
-lev = levels(data$teg_eign)[c(1,2,7,8,10,11)] 
+lev = levels(data$teg_eign)[c(1,2,7,8,11)] 
 data = data[which(data$teg_eign %in% lev),]
 data$teg_eign = droplevels(data$teg_eign)
 
@@ -120,7 +120,7 @@ dim(data) == dim(na.omit(data))
 Now we'll check whether any of the numerical variables are highly correlated. 
 
 ```{r}
-X = with(data,cbind(kdagur,aldur,ummal,ibm2,stig10,bilskurm2,svalm2,geymm2))
+X = with(data,cbind(kdagur,aldur,ummal,ibm2,stig10,bilskurm2,ntm2,svalm2,geymm2))
 cor(X)
 ```
 
@@ -145,7 +145,7 @@ grid.arrange(density1,density2,nrow=2)
 data$nuvirdi = log(data$nuvirdi)
 ```
 
-Let's plot nuvirdi against some variables. 
+Here we set nuvirdi log transformes. Let's plot nuvirdi against some variables.
 
 ```{r}
 p1 <- ggplot(data, aes(x=kdagur,y=nuvirdi)) +
@@ -313,48 +313,132 @@ write.csv(data, file = "MyData.csv",row.names = F)
 Jesús, write.csv viðheldur ekki hvaða breytur eru factor og hverjar eru numerical. Þurfum að finna útúr þessu. 
 
 ```{r}
-rm(list = ls())
+#rm(list = ls())
 #dat = read.csv("MyData.csv")
 set.seed(8756)
 dat = data
+dat$svfn=NULL 
 n = dim(dat)[1]
 train = sample(n,floor(n*0.8)) #getum haft eitthvað annað split
 dat.train = dat[train,]
 dat.test = dat[-train,]
 ```
 
+
 ## Linear Regression
-Getum gert einhverja aðra aðferð, vildi bara prófa. 
 
 ```{r}
 fit.lm = lm(nuvirdi~.,dat.train)
 summary(fit.lm)
 pred.lm = predict(fit.lm, dat.test)
+RSS1 = mean((dat.test$nuvirdi - pred.lm)^2)
+Rss = mean((exp(dat.test$nuvirdi)-exp(pred.lm))^2)
+Rss
+RSS1
+```
+
+####Diagnostics of linear regression
+
+Here below we can see some plots for the linear regression model.
+
+```{r}
+diagnost = fortify(fit.lm)
+diagnost$.index <- 1:(dim(diagnost)[1])
+res_sd <- sd(diagnost$.resid)
+resPlot <- ggplot(diagnost, aes(x=seq(1:length(.resid)),y=.resid)) +
+                geom_point()+
+                geom_hline(yintercept=0, col="red", linetype="dashed")+
+                geom_hline(yintercept=2*res_sd, col="blue", linetype="dashed")+
+                geom_hline(yintercept=-2*res_sd, col="blue", linetype="dashed")+
+                geom_hline(yintercept=3*res_sd, col="green", linetype="dashed")+
+                geom_hline(yintercept=-3*res_sd, col="green", linetype="dashed")+
+                xlab("Index")+ylab("Residuals")+labs(title = "Index plot of residuals")+
+                geom_text(aes(label=ifelse(abs(.resid)>3*res_sd,.index,"")),hjust=-.5, vjust=0.4)+
+                theme_grey()
+resPlot
+```
+
+
+
+```{r}
+QQPlot<-ggplot(diagnost, aes(sample = .resid))+
+        stat_qq()+
+        geom_abline(slope=res_sd)+
+        ylab("Residuals")+
+        theme_grey()
+QQPlot
+```
+
+
+```{r}
+LevPlot <- ggplot(diagnost, aes(x=seq(1:length(.hat)),y=.hat))+
+                  geom_point()+
+                  geom_hline(yintercept=3*mean(diagnost$.hat), col="red", linetype="dashed")+
+                  xlab("Index")+
+                  ylab("Leverages")+
+                  geom_text(aes(label=ifelse(.hat > 3*mean(diagnost$.hat),.index,"")),hjust=0, vjust=0)+
+                  theme_grey()
+LevPlot
+```
+
+
+
+
+
+
+##Best subset selection.
+
+Veit ekki hvort við ættum að hafa þetta?
+```{r}
+library(leaps)
+regfit.fwd <- regsubsets(nuvirdi ~ ., data = dat.test, 
+    nvmax = 150,method="forward")
+for.summary <- summary(regfit.fwd)
+which.max(for.summary$adjr2)
+
+ggplot(data.frame(y=for.summary$adjr2, x=1:150), aes(x,y))+geom_point() + ylab("AdjR2") + xlab("Subset size")
+
+
+
 ```
 
 
 ## Lasso Regression
 
-kannski gera best subset selection. 
 
 ```{r}
 ytrain = data.matrix(dat.train[,"nuvirdi"])
 Xtrain = data.matrix(dat.train[,!(colnames(dat.train) %in% c("nuvirdi"))])
+Xtest = data.matrix(dat.test[,!(colnames(dat.train) %in% c("nuvirdi"))])
 Xtrain
-fit.lasso = cv.glmnet(Xtrain,ytrain)
+grid <- 10^seq(4, -20, length=100)
+fit.lasso = cv.glmnet(Xtrain,ytrain,alpha=0, lambda=grid, thresh=1e-12)
 plot(fit.lasso)
 best.lambda = fit.lasso$lambda.min
-pred.lasso = predict(fit.lasso,dat.test)
+pred.lasso = predict(fit.lasso,Xtest,s=best.lambda)
+RSS2 <- mean((dat.test$nuvirdi - pred.lasso)^2)
+RssNormal2 <- mean((exp(dat.test$nuvirdi)-exp(pred.lasso))^2)
+RSS2
+RssNormal2
+
+best.model = glmnet(Xtrain, ytrain, alpha = 1)
+predict(best.model, s = 0.01, type = "coefficients")
+
+
+```
+
+
+
+```{r}
+
 ```
 
 
 
 
+###Classification 
 
-
-
-
-
+Veit ekki hvaða aðferðir: Mögulega random forrest og SVM? Langar mögulega að reyna að classifia svfn breytuna. Sem sagt hvort hun se i kopavogi, reykjavik o.s.frv. Þurfum þa að taka ut undirmatssvaeði og matssvæði þvi annars predictum við 100 %.
 
 
 

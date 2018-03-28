@@ -307,14 +307,14 @@ undirmatssvaedi | sub-location (63 levels)
 ibteg           | type of property (2 levels)
 
 ```{r}
-write.csv(data, file = "MyData.csv",row.names = F)
+#write.csv(data, file = "MyData.csv",row.names = F)
 ```
 
 Jesús, write.csv viðheldur ekki hvaða breytur eru factor og hverjar eru numerical. Þurfum að finna útúr þessu. 
 
 ```{r}
 #rm(list = ls())
-#dat = read.csv("MyData.csv")
+#dat2 = read.csv("MyData.csv",as.is = T)
 set.seed(8756)
 dat = data
 dat$svfn=NULL 
@@ -335,9 +335,11 @@ RSS1 = mean((dat.test$nuvirdi - pred.lm)^2)
 Rss = mean((exp(dat.test$nuvirdi)-exp(pred.lm))^2)
 Rss
 RSS1
+
 ```
 
 ####Diagnostics of linear regression
+
 
 Here below we can see some plots for the linear regression model.
 
@@ -358,7 +360,7 @@ resPlot <- ggplot(diagnost, aes(x=seq(1:length(.resid)),y=.resid)) +
 resPlot
 ```
 
-
+Here we can see the residuals plotted against there index. The blue line is 2 times the standard deviation of the residuals and the green line is 3 times the standard deviation. We can see that there are few points that exceed the green line and they could be looked at more closely. Also we can see that there seems to be a constant variance.
 
 ```{r}
 QQPlot<-ggplot(diagnost, aes(sample = .resid))+
@@ -369,20 +371,20 @@ QQPlot<-ggplot(diagnost, aes(sample = .resid))+
 QQPlot
 ```
 
+Here we can see the normal Q-Q plot for the model. It looks good and they seem to follow a normal distribution but the ends are more spread out. They are heavi-tailed.
 
 ```{r}
 LevPlot <- ggplot(diagnost, aes(x=seq(1:length(.hat)),y=.hat))+
                   geom_point()+
-                  geom_hline(yintercept=3*mean(diagnost$.hat), col="red", linetype="dashed")+
+                  geom_hline(yintercept=4*mean(diagnost$.hat), col="red", linetype="dashed")+
                   xlab("Index")+
                   ylab("Leverages")+
-                  geom_text(aes(label=ifelse(.hat > 3*mean(diagnost$.hat),.index,"")),hjust=0, vjust=0)+
+                  geom_text(aes(label=ifelse(.hat > 4*mean(diagnost$.hat),.index,"")),hjust=0, vjust=0)+
                   theme_grey()
 LevPlot
 ```
 
-
-
+Here we can see the Leverage plot. There seems to be one point that has very high leverage. This point is in undirmatssvæði 101 which has only 2 observations and there for it has this high leverage.
 
 
 
@@ -405,14 +407,14 @@ ggplot(data.frame(y=for.summary$adjr2, x=1:150), aes(x,y))+geom_point() + ylab("
 
 ## Lasso Regression
 
-
+Mögulega þarf að scale-a breytti ekki miklu samt. Lasso er samt frekar lelegt miðað við linear.
 ```{r}
 ytrain = data.matrix(dat.train[,"nuvirdi"])
 Xtrain = data.matrix(dat.train[,!(colnames(dat.train) %in% c("nuvirdi"))])
 Xtest = data.matrix(dat.test[,!(colnames(dat.train) %in% c("nuvirdi"))])
 Xtrain
 grid <- 10^seq(4, -20, length=100)
-fit.lasso = cv.glmnet(Xtrain,ytrain,alpha=0, lambda=grid, thresh=1e-12)
+fit.lasso = cv.glmnet(Xtrain,ytrain,alpha=1, lambda=grid, thresh=1e-12)
 plot(fit.lasso)
 best.lambda = fit.lasso$lambda.min
 pred.lasso = predict(fit.lasso,Xtest,s=best.lambda)
@@ -422,14 +424,7 @@ RSS2
 RssNormal2
 
 best.model = glmnet(Xtrain, ytrain, alpha = 1)
-predict(best.model, s = 0.01, type = "coefficients")
-
-
-```
-
-
-
-```{r}
+predict(best.model, s = fit.lasso$lambda.1se, type = "coefficients")
 
 ```
 
@@ -439,25 +434,4 @@ predict(best.model, s = 0.01, type = "coefficients")
 ###Classification 
 
 Veit ekki hvaða aðferðir: Mögulega random forrest og SVM? Langar mögulega að reyna að classifia svfn breytuna. Sem sagt hvort hun se i kopavogi, reykjavik o.s.frv. Þurfum þa að taka ut undirmatssvaeði og matssvæði þvi annars predictum við 100 %.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

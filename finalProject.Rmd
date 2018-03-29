@@ -317,7 +317,8 @@ Jesús, write.csv viðheldur ekki hvaða breytur eru factor og hverjar eru numer
 #dat2 = read.csv("MyData.csv",as.is = T)
 set.seed(8756)
 dat = data
-dat$svfn=NULL 
+svfn = dat$svfn
+dat$svfn = NULL
 n = dim(dat)[1]
 train = sample(n,floor(n*0.8)) #getum haft eitthvað annað split
 dat.train = dat[train,]
@@ -360,7 +361,7 @@ resPlot <- ggplot(diagnost, aes(x=seq(1:length(.resid)),y=.resid)) +
 resPlot
 ```
 
-Here we can see the residuals plotted against there index. The blue line is 2 times the standard deviation of the residuals and the green line is 3 times the standard deviation. We can see that there are few points that exceed the green line and they could be looked at more closely. Also we can see that there seems to be a constant variance.
+Here we can see the residuals plotted against their index. The blue line is 2 times the standard deviation of the residuals and the green line is 3 times the standard deviation. We can see that there are few points that exceed the green line and they could be looked at more closely. Also we can see that there seems to be a constant variance.
 
 ```{r}
 QQPlot<-ggplot(diagnost, aes(sample = .resid))+
@@ -400,8 +401,6 @@ which.max(for.summary$adjr2)
 
 ggplot(data.frame(y=for.summary$adjr2, x=1:150), aes(x,y))+geom_point() + ylab("AdjR2") + xlab("Subset size")
 
-
-
 ```
 
 
@@ -425,13 +424,62 @@ RssNormal2
 
 best.model = glmnet(Xtrain, ytrain, alpha = 1)
 predict(best.model, s = fit.lasso$lambda.1se, type = "coefficients")
-
 ```
 
-
-
-
-###Classification 
+### Classification 
 
 Veit ekki hvaða aðferðir: Mögulega random forrest og SVM? Langar mögulega að reyna að classifia svfn breytuna. Sem sagt hvort hun se i kopavogi, reykjavik o.s.frv. Þurfum þa að taka ut undirmatssvaeði og matssvæði þvi annars predictum við 100 %.
 
+```{r}
+str(dat)
+dat = data.frame(dat,svfn)
+mats = dat$matssvaedi
+undir = dat$undirmatssvaedi
+dat$matssvaedi = NULL
+dat$undirmatssvaedi = NULL
+
+n = dim(dat)[1]
+p = dim(dat)[2]
+train = sample(n,floor(n*0.8)) #getum haft eitthvað annað split
+dat.train = dat[train,]
+dat.test = dat[-train,]
+```
+
+## Random Forest
+
+```{r}
+library(randomForest)
+err = integer()
+mtrys = seq(from = 2, to = 20, by = 1)
+for(i in mtrys){
+  fit.rf = randomForest(svfn~., dat.train, mtry = i, ntree = 200) 
+  pred.rf = predict(fit.rf, dat.test)
+  err[i-1] = mean(dat.test$svfn != pred.rf)
+  print(i)
+}
+
+plot(mtrys, err, xlab = "nr of variables considered at each split", ylab = "MSE", pch = 19)
+min(err)
+which.min(err)
+fit.rf = randomForest(svfn~., dat.train, mtry = 13, ntree = 200)
+pred.rf = predict(fit.rf, dat.test)
+err = mean(dat.test$svfn != pred.rf)
+err
+fit.rf
+plot(fit.rf)
+```
+
+```{r}
+library(e1071)
+#tune.rf = tune(randomForest, svfn ~ ., data = dat.train, ranges = list(mtry = mtrys, ntree = c(100,300,500,800)))
+```
+
+## Support Vector Machine
+ 
+```{r}
+fit.svm = svm(svfn~.,data = dat.train,scale = T, kernel = "radial", cost = 1) #gamma
+pred.svm = predict(fit.svm,dat.test)
+err.svm = mean(pred.svm!=dat.test$svfn)
+err.svm
+tune.svm = tune(svm, svfn~.,data = dat.test, kernel = "radial", ranges = list(cost = c(0.01,0.5,1,5), gamma = c(0.01,0.05,0.1,0.5,1)))
+```

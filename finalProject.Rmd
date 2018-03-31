@@ -1,6 +1,6 @@
 ---
 title: "Final Project"
-author: "Rakel María Brynjólfsdóttir"
+author: "Rakel María Brynjólfsdóttir og Ævar Ingi Jóhannesson"
 date: "March 23, 2018"
 output:
   prettydoc::html_pretty:
@@ -346,9 +346,9 @@ Here below we can see some plots for the linear regression model.
 
 ```{r}
 diagnost = fortify(fit.lm)
-diagnost$.index <- 1:(dim(diagnost)[1])
-res_sd <- sd(diagnost$.resid)
-resPlot <- ggplot(diagnost, aes(x=seq(1:length(.resid)),y=.resid)) +
+diagnost$.index = 1:(dim(diagnost)[1])
+res_sd = sd(diagnost$.resid)
+resPlot = ggplot(diagnost, aes(x=seq(1:length(.resid)),y=.resid)) +
                 geom_point()+
                 geom_hline(yintercept=0, col="red", linetype="dashed")+
                 geom_hline(yintercept=2*res_sd, col="blue", linetype="dashed")+
@@ -385,7 +385,7 @@ LevPlot <- ggplot(diagnost, aes(x=seq(1:length(.hat)),y=.hat))+
 LevPlot
 ```
 
-Here we can see the Leverage plot. There seems to be one point that has very high leverage. This point is in undirmatssvæði 101 which has only 2 observations and there for it has this high leverage.
+Here we can see the Leverage plot. There seems to be one point that has very high leverage. This point is in undirmatssvæði 101 which has only 2 observations and there for it has this high leverage. So it doesn't mean that it's an outlier.
 
 
 
@@ -394,12 +394,15 @@ Here we can see the Leverage plot. There seems to be one point that has very hig
 Veit ekki hvort við ættum að hafa þetta?
 ```{r}
 library(leaps)
-regfit.fwd <- regsubsets(nuvirdi ~ ., data = dat.test, 
+regfit.fwd <- regsubsets(nuvirdi ~ ., data = dat.train, 
     nvmax = 150,method="forward")
 for.summary <- summary(regfit.fwd)
 which.max(for.summary$adjr2)
 
 ggplot(data.frame(y=for.summary$adjr2, x=1:150), aes(x,y))+geom_point() + ylab("AdjR2") + xlab("Subset size")
+
+
+coef(regfit.fwd,4)
 
 ```
 
@@ -425,6 +428,45 @@ RssNormal2
 best.model = glmnet(Xtrain, ytrain, alpha = 1)
 predict(best.model, s = fit.lasso$lambda.1se, type = "coefficients")
 ```
+
+##Boosting
+
+
+```{r}
+library(gbm)
+lambd <-  seq(0.001, 0.02, by=0.001)
+lambd <- c(lambd, seq(0.02, 0.5, by=0.01))
+m <- length(lambd)
+testErr <- rep(NA, m)
+for (i in 1:m) {
+    boostCol <- gbm(nuvirdi ~ ., data = dat.train,
+                    distribution = "gaussian",
+                    n.trees = 200, 
+                    shrinkage = lambd[i])
+    testPred <- predict(boostCol, dat.test, n.trees = 200)
+    testErr[i] = mean((dat.test$nuvirdi - testPred)^2)
+}
+
+lambd[which.min(testErr)]
+
+ggplot(data.frame(x=lambd, y=testErr), aes(x=x, y=y)) +
+      xlab("Shrinkage") + 
+      ylab("Test MSE") + 
+      geom_point()
+
+
+boost.fit <- gbm(nuvirdi ~ ., data = dat.train, distribution = "gaussian", n.trees = 500, shrinkage = 0.24)
+boost.pred <- predict(boost.fit, dat.test, n.trees = 500)
+RssBoos = mean((dat.test$nuvirdi - boost.pred)^2)
+Rss2Boost = mean((exp(dat.test$nuvirdi) - exp(boost.pred))^2)
+
+Rss2Boost
+RssBoos
+
+
+```
+
+
 
 ### Classification 
 
@@ -458,6 +500,8 @@ for(i in mtrys){
   print(i)
 }
 
+
+
 plot(mtrys, err, xlab = "nr of variables considered at each split", ylab = "MSE", pch = 19)
 min(err)
 which.min(err)
@@ -467,6 +511,7 @@ err = mean(dat.test$svfn != pred.rf)
 err
 fit.rf
 plot(fit.rf)
+importance(fit.rf) #HERE we can see the most important variables
 ```
 
 ```{r}
@@ -481,5 +526,14 @@ fit.svm = svm(svfn~.,data = dat.train,scale = T, kernel = "radial", cost = 1) #g
 pred.svm = predict(fit.svm,dat.test)
 err.svm = mean(pred.svm!=dat.test$svfn)
 err.svm
-tune.svm = tune(svm, svfn~.,data = dat.test, kernel = "radial", ranges = list(cost = c(0.01,0.5,1,5), gamma = c(0.01,0.05,0.1,0.5,1)))
+tune.svm = tune(svm, svfn~.,data = dat.test, kernel = "radial", ranges = list(cost = c(0.01,0.5,1,5), gamma = c(0.01,0.05,0.1,0.5,1)))#Cost 5, Gamma = 0.5
+summary(tune.svm)
+
+fit.svm2 = svm(svfn~.,data = dat.train,scale = T, kernel = "radial", cost = 5,gamma=0.5)
+pred.svm2 = predict(fit.svm2,dat.test)
+err.svm2 = mean(pred.svm2 != dat.test$svfn)
+err.svm2
 ```
+
+
+

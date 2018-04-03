@@ -489,6 +489,11 @@ err.svm2
 
 ###Data preprocessing
 
+```{r}
+data = read.csv("gagnasafn_ibudarhusnaedi.csv", header = T, sep = ";", dec = ",")
+```
+
+
 We start by removing all the data which is not in the capital region. 
 
 ```{r, eval = F}

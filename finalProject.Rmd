@@ -409,16 +409,13 @@ RssBoos
 
 ### Classification 
 
-Here we are going to predict in which town these properties belong to.
-
+Here we are going to predict in which town(Svfn) the properties belong to. We start by taking only properties from Reykjavik,kopavogi and Hafnarfirði.
 The classes are 
 Rvk
 Kop
 Hfj
 
-Mögulega ættum við að hafa bara 3. Þau tala um það i verkefnalysingunni.
-
-```{r,eval = F}
+```{r}
 str(dat)
 dat = data.frame(dat,svfn)
 mats = dat$matssvaedi
@@ -426,21 +423,39 @@ undir = dat$undirmatssvaedi
 dat$matssvaedi = NULL
 dat$undirmatssvaedi = NULL
 
-#Höfum bara Rvk, Kop og Hfj. 
 area = levels(data$svfn)[c(1,2,5)]
 dat = dat[which(data$svfn %in% area),]
 dat$svfn = droplevels(dat$svfn)
 
 n = dim(dat)[1]
 p = dim(dat)[2]
-train = sample(n,floor(n*0.8)) #getum haft eitthvað annað split
+train = sample(n,floor(n*0.8))
 dat.train = dat[train,]
 dat.test = dat[-train,]
+
+n2 = dim(dat.train)[1]
+val = sample(n2,floor(n2*0.8))
+dat.train = dat.train[val,]
+dat.val = dat.train[-val,]
+
 ```
+
+Here we take out Matssvæði and undirmatsvæði because they are describing the same thing as Svfn.
+We also split to a train set, test set and a validation set to use in cross validation for SVM.
+
+```{r}
+table(dat$svfn)
+```
+
+We can see that most of the properties are in Reykjavik.
 
 ## Random Forest
 
-```{r,eval = F}
+First we use Random Forest to try and classify into these three groups.
+
+We start by finding the number m which is the sample of random predictors that is chosen as split candidates in each split.
+
+```{r}
 library(randomForest)
 set.seed(4949)
 err = integer()
@@ -457,33 +472,90 @@ ggplot(data=data.frame(x=mtrys,y=err),aes(x=x,y=y))+
   ylab("MSE")+
   geom_point()
 
-min(err)
-minErr = which.min(err)
-fit.rf = randomForest(svfn~., dat.train, mtry = minErr, ntree = 200)
-pred.rf = predict(fit.rf, dat.test)
-err = mean(dat.test$svfn != pred.rf)
-err
-fit.rf
-importance(fit.rf) #HERE we can see the most important variables
 ```
 
+Here we can see that it seems that 17 variables gives the lowest MSE. Let's fit a model using 1000 trees with $m=17$.
+
+
+```{r}
+minErr = which.min(err)
+fit.rf = randomForest(svfn~., dat.train, mtry =minErr+1, ntree = 1000)
+pred.rf = predict(fit.rf, dat.test)
+misErr = mean(dat.test$svfn != pred.rf)
+
+misErr
+```
+
+Here we can see that the missclassification error rate is:  11.36% 
+
+
+```{r}
+fit.rf
+importance(fit.rf) 
+```
+
+Here we can see both the confusion matrix and the most important variables for the classification.
+
+The most important variables are:
+Aldur
+Ummal
+Ibm2
+Nuvirdi
+
+
+
 ## Support Vector Machine
- 
-```{r,eval = F}
+
+Here we use SVM without a kernel and with radial kernel to try and classify. The svm function from the e1071 library uses the One-versus-one classification. We start by using the validation set to choose C and then $\gamma$ for the radial kernal. We also scale the data for the SVM because it gave a better result.
+
+```{r}
 library(e1071)
-fit.svm = svm(svfn~.,data = dat.train,scale = T, kernel = "radial", cost = 200,gamma=0.1) #gamma
+set.seed(5040)
+
+tune.svm = tune(svm, svfn~.,
+                data = dat.val,
+                scale=T, 
+                ranges = list(cost = c(50,100,200,300)))  
+summary(tune.svm)
+
+
+fit.svm = svm(svfn~.,
+              data = dat.train,
+              scale = T,
+              cost = 200)
 pred.svm = predict(fit.svm,dat.test)
 err.svm = mean(pred.svm!=dat.test$svfn)
 err.svm
-
-#tune.svm = tune(svm, svfn~.,data = dat.train, scale=T, kernel = "radial", ranges = list(cost = c(50,100,200), gamma = 0.1))#Cost 5, Gamma = 0.5
-#summary(tune.svm)
-
-fit.svm2 = svm(svfn~.,data = dat.train,scale = T, kernel = "radial", cost = 5,gamma=0.5)
-pred.svm2 = predict(fit.svm2,dat.test)
-err.svm2 = mean(pred.svm2 != dat.test$svfn)
-err.svm2
 ```
+
+
+Here we don't use a kernel for our SVM and get the missclassification error rate :
+
+
+```{r}
+set.seed(5040)
+tune.svm2 = tune(svm, svfn~.,
+                data = dat.val,
+                scale=T,
+                kernel="radial",
+                ranges = list(gamma=c(0.01,0.1,0.5),cost = c(50,100,200,300))) 
+summary(tune.svm2)
+
+
+fit.svm2 = svm(svfn~.,
+              data = dat.train,
+              scale = T,
+              kernel="radial",
+              gamma = 0.1,
+              cost = 50)
+pred.svm = predict(fit.svm2,dat.test)
+err.svm2 = mean(pred.svm!=dat.test$svfn)
+err.svm2
+
+table(pred.svm,dat.test$svfn)
+```
+
+Here we use radial kernel and get..
 
 ### Appendix
 

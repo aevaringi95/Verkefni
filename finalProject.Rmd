@@ -18,122 +18,65 @@ library(ggplot2)
 library(grid)
 library(gridExtra)
 library(glmnet)
+library(e1071)
+library(randomForest)
 ```
 
+We start by loading the data which has already been cleaned. The particulars of the data preproccesing can be seen in the appendix. 
+
 ```{r}
-dataO = read.csv("gagnasafn_ibudarhusnaedi.csv",
-                header  = T,
-                sep = ";",
-                dec = ",")
-data = dataO #svo ég þurfi ekki að keyra allt aftur, hendum þessu út seinna
+data = read.csv("MyData.csv")
 ```
 
-###Data preprocessing
-
-We start by removing all the data which is not in the capital region. 
-
-```{r}
-capitalArea = c(0000,1000,1100,1300,1400,1604,1606)
-data = data[data$svfn %in% capitalArea,]
-```
-
-Now we are going to remove the variables that we won't be using.
-
-```{r}
-delete = names(data)[c(1,2,5,6,7,10,11,12,13,14,15,17,18,19,20,21,
-                       25,26,30,37,38,40,41,42,44,47,50,52,53)]
-data = data[,-which(names(data) %in% delete)]
-```
-
-Some variable have many levels and few observations on some levels so we are going to remove those observations. 
-
-```{r}
-#Einbylishus, Fjolbylishus, Ibudareign, Ibudarhus, Parhus, Radhus. Getum fækkað meira 
-lev = levels(data$teg_eign)[c(1,2,7,8,11)] 
-data = data[which(data$teg_eign %in% lev),]
-data$teg_eign = droplevels(data$teg_eign)
-
-data$matssvaedi = as.factor(data$matssvaedi)
-lev = levels(data$matssvaedi)[c(61,62)]
-data = data[-which(data$matssvaedi %in% lev),]
-data$matssvaedi = droplevels(data$matssvaedi)
-
-data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
-lev = levels(data$undirmatssvaedi)[c(10,36,38,39,50,55)]
-data = data[-which(data$undirmatssvaedi %in% lev),]
-data$undirmatssvaedi = droplevels(data$undirmatssvaedi)
-```
-
-Many of the numerical variables should be factors, and some factors should be numerical. We are also going to combine some of the levels for certain factors since the higher levels have very few observations in many cases.
-
-```{r}
-data$svfn = as.factor(data$svfn)
-data$lyfta[which(data$lyfta != 0)] = 1
-data$lyfta = as.factor(data$lyfta)
-data$fjsturt[which(!(data$fjsturt %in% c(0,1)))] = 2
-data$fjsturt = as.factor(data$fjsturt)
-data$fjklos[which(!(data$fjklos %in% c(0,1)))] = 2
-data$fjklos = as.factor(data$fjklos)
-data$fjbkar[which(!(data$fjbkar %in% c(0,1)))] = 2
-data$fjbkar = as.factor(data$fjbkar)
-data$fjeld[which(!(data$fjeld %in% c(0,1)))] = 2
-data$fjeld = as.factor(data$fjeld)
-data$fjstof[which(!(data$fjstof %in% c(0,1)))] = 2
-data$fjstof = as.factor(data$fjstof)
-data$fjhaed = as.factor(data$fjhaed)
-data$fjherb[which(!(data$fjherb %in% c(0,1,2,3,4,5)))] = 6
-data$fjherb = as.factor(data$fjherb)
-data$svalm2 = as.numeric(data$svalm2)
+```{r, echo = F}
+#laga factor, prentast ekki
 data$fjmib = as.factor(data$fjmib)
+data$lyfta = as.factor(data$lyfta)
+data$fjhaed = as.factor(data$fjhaed)
+data$fjbkar = as.factor(data$fjbkar)
+data$fjsturt = as.factor(data$fjsturt)
+data$fjklos = as.factor(data$fjklos)
+data$fjeld = as.factor(data$fjeld)
+data$fjherb = as.factor(data$fjherb)
+data$fjstof = as.factor(data$fjstof)
+data$matssvaedi = as.factor(data$matssvaedi)
+data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
 data$ibteg = as.factor(data$ibteg)
-data$svfn = revalue(data$svfn, c("0"="Rvk","1000"="Kop",
-                                 "1100"="Sel","1300"="Grb",
-                                 "1400"="Hfj","1604"="Mos"))
-data$ibteg = revalue(data$ibteg, c("11"="1","12"="2"))
-data$byggar = droplevels(data$byggar)
 ```
 
-We are going to change the kdagur variable so that we have the days since the property was bought. 
+The data is now as follows: 
 
-```{r}
-data$kdagur <- strptime(x = as.character(data$kdagur),
-                                format = "%d.%m.%Y")
-mydate <- as.Date("2018-04-01")
-data$kdagur <- as.Date(data$kdagur)
-data$kdagur <- as.numeric(mydate-data$kdagur)
-```
-
-And we're going to change the byggar variable into the age of the house in years. 
-
-```{r}
-data$byggar <- 2018 - as.numeric(as.character(data$byggar))
-colnames(data)[5] = "aldur"
-```
-
-Now we remove 0 values for nuvirdi and check for NA values. 
-```{r}
-noNuvirdi <- which(data$nuvirdi==0)
-data = data[-noNuvirdi,]
-dim(data) == dim(na.omit(data))
-```
-
-Now we'll check whether any of the numerical variables are highly correlated. 
-
-```{r}
-X = with(data,cbind(kdagur,aldur,ummal,ibm2,stig10,bilskurm2,ntm2,svalm2,geymm2))
-cor(X)
-```
-
-The ibm2 and ntm2 have a very high correlation so I'm removing one of them. 
-
-```{r}
-data$ntm2 = NULL 
-```
+  Variable     |  type     | Description               |  levels
+-------------- | --------- | ------------------------- | ----------------------- 
+kdagur         | numerical | days since last bought    | 
+nuvirdi        | numerical | log of current price      | 
+teg_eign       | factor    | type of property          | Einbýlishús, Fjölbýlishús, Íbúðareign, Íbúðarhús, Raðhús
+svfn           | factor    | town id                   | Grb, Hfj, Kop, Mos, Rvk, Sel
+aldur          | numerical | age of house              |   
+fjmib          | factor    | nr of apartments          | 1,2,3,4
+lyfta          | factor    | elevator or not           | 0,1
+ummal          | numerical | circumference of property | 
+ibm2           | numerical | area of property          |
+ntm2           | numerical | netto area of property    |
+fjhaed         | factor    | number of floors          | 1,2,3,4
+fjbkar         | factor    | number of bathtubs        | 0,1,2 (2 or more)
+fjsturt        | factor    | number of showers         | 0,1,2 (2 or more)
+fjklos         | factor    | number of toilets         | 0,1,2 (2 or more)
+fjeld          | factor    | number of kitchens        | 0,1,2 (2 or more)
+fjherb         | factor    | number of rooms           | 0,1,2,3,4,5,6 (6 or more)
+fjstof         | factor    | number of livingrooms     | 0,1,2 (2 or more)
+stig10         | numerical | construction stage        |
+bilskurm2      | numerical | area of garage            |
+svalm2         | numerical | area of balcony           |
+geymm2         | numerical | area of storage space     |
+matssvaedi     | factor    | location                  | 60 levels
+undirmatssvaedi| factor    | sub-location              | 62 levels
+ibteg          | factor    | type of property          | 1(single-family), 2(aparment building)
 
 ### Descriptive plots of the data
 
+We start by looking at the density of the Nuvirdi variable.  
 
-Here we look at the density of the Nuvirdi function. When we log scale it it looks a lot more like normal density.
 ```{r}
 density1 <- ggplot(data,aes(nuvirdi))+
   geom_density()
@@ -142,10 +85,16 @@ density2 <- ggplot(data,aes(log(nuvirdi)))+
   geom_density()
 
 grid.arrange(density1,density2,nrow=2)
+```
+
+It's evident that when we plot nuvirdi on a log scale it looks a lot more like the normal distribution, so we're going to log transform the response. 
+
+```{r}
 data$nuvirdi = log(data$nuvirdi)
 ```
 
-Here we set nuvirdi log transformes. Let's plot nuvirdi against some variables.
+
+Let's plot nuvirdi against some variables to see if there are any relationships. 
 
 ```{r}
 p1 <- ggplot(data, aes(x=kdagur,y=nuvirdi)) +
@@ -184,7 +133,7 @@ grid.arrange(p1,p2,p3,p4,nrow = 2)
 grid.arrange(p5,p6,p7,p8,nrow = 2)
 ```
 
-Let's plot geymm2, bilskurm2 and ibm2 with log transformations. 
+It looks like geymm2, bilskurm2 and ibm2 might have a more linear relatioship with nuvirdi on a log scale. 
 
 ```{r}
 B = data$bilskurm2
@@ -217,7 +166,7 @@ A log transformation is not suitable for the bilkskurm2 variable, but it definit
 ```{r}
 data$ibm2 = log(data$ibm)
 
-G[ind3] = G[ind3] - 1.8 #veit ekki hvort þetta sé góð lausn en gerði svipað í bayes
+G[ind3] = G[ind3] - 1.8 
 data$geymm2 = G
 ggplot(data, aes(x=geymm2,y=nuvirdi)) +
           geom_point(size=0.5) +
@@ -270,63 +219,41 @@ grid.arrange(f1,f2,f3,
              f8,f9,f10,f11,f12,ncol=3)
 ```
 
-Now that we are happy with the data we'll check the correlation again. 
+Most of the factor variables seem to have a relationship with nuvridi, especially fjmib, fjhaed and fjherb. 
+
+Finally, we'll check the correlation between the numerical variables. 
 
 ```{r}
 X = with(data,cbind(kdagur,aldur,ummal,ibm2,stig10,bilskurm2,svalm2,geymm2))
 cor(X)
 ```
 
-Now the data is as follows: 
+None of the variables are highly correlated. 
 
-  Variable      | Description
---------------- | -----------
-kdagur          | days since property was bought
-nuvirdi         | log of current price
-teg_eign        | type of property (6 levels)
-svfn            | town id (6 levels)
-aldur           | age of house
-fjmib           | number of apartments in building (4 levels)
-lyfta           | whether house has elevator or not (2 levels)
-ummal           | circumference of property 
-ibm2            | log of area of property
-ntm2            | netto area of property
-fjhaed          | number of floors in building (4 levels)
-fjbkar          | number of bathtubs (3 levels)
-fjsturt         | number of showers (3 levels)
-fjklos          | number of toilets (3 levels)
-fjeld           | number of kitchens (3 levels)
-fjherb          | number of rooms (7 levels)
-fjstof          | number of livingrooms (3 levels)
-stig10          | construction stage 
-bilskurm2       | area of garage
-svalm2          | area of balcony
-geymm2          | log of area of storage space 
-matssvaedi      | location (60 levels)
-undirmatssvaedi | sub-location (63 levels)
-ibteg           | type of property (2 levels)
+### Modeling the data
+
+
+When exploring the data we realised that the svfn variable and the two matssvaedi variables are linearly dependent since they are describing the same thing. For the regression part we decided to use the matssvaedi variables and for the classification we are going to use the svfn variable. 
 
 ```{r}
-#write.csv(data, file = "MyData.csv",row.names = F)
-```
-
-Jesús, write.csv viðheldur ekki hvaða breytur eru factor og hverjar eru numerical. Þurfum að finna útúr þessu. 
-
-```{r}
-#rm(list = ls())
-#dat2 = read.csv("MyData.csv",as.is = T)
 set.seed(8756)
 dat = data
 svfn = dat$svfn
 dat$svfn = NULL
+```
+
+Now we'll split the data into a training and test set. 
+
+```{r}
 n = dim(dat)[1]
-train = sample(n,floor(n*0.8)) #getum haft eitthvað annað split
+train = sample(n,floor(n*0.8)) 
 dat.train = dat[train,]
 dat.test = dat[-train,]
 ```
 
-
 ## Linear Regression
+
+To start we are using linear regression to predict (the log of) nuvirdi. 
 
 ```{r}
 fit.lm = lm(nuvirdi~.,dat.train)
@@ -336,10 +263,9 @@ RSS1 = mean((dat.test$nuvirdi - pred.lm)^2)
 Rss = mean((exp(dat.test$nuvirdi)-exp(pred.lm))^2)
 Rss
 RSS1
-
 ```
 
-####Diagnostics of linear regression
+# Diagnostics of linear regression
 Here below we can see some plots for the linear regression model.
 
 ```{r}
@@ -390,7 +316,7 @@ Here we can see the Leverage plot. There seems to be one point that has very hig
 ##Best subset selection.
 
 Here we can see that R adjusted.
-```{r}
+```{r,eval = F}
 library(leaps)
 regfit.fwd <- regsubsets(nuvirdi ~ ., data = dat.train, 
     nvmax = 150,method="forward")
@@ -404,7 +330,7 @@ ggplot(data.frame(y=for.summary$adjr2, x=1:150), aes(x,y))+geom_point() + ylab("
 ## Lasso Regression
 
 Mögulega þarf að scale-a breytti ekki miklu samt. Lasso er samt frekar lelegt miðað við linear.
-```{r}
+```{r,eval = F}
 ytrain = data.matrix(dat.train[,"nuvirdi"])
 Xtrain = data.matrix(dat.train[,!(colnames(dat.train) %in% c("nuvirdi"))])
 Xtest = data.matrix(dat.test[,!(colnames(dat.train) %in% c("nuvirdi"))])
@@ -423,7 +349,7 @@ RssNormal2
 Here we can see that when we do Lasso regression we can see that the MSE is much higher then for a normal linear regression.
 
 
-```{r}
+```{r,eval = F}
 best.model = glmnet(Xtrain, ytrain, alpha = 1)
 predict(best.model, s = fit.lasso$lambda.1se, type = "coefficients")
 ```
@@ -435,7 +361,7 @@ The first two predictors to tend to zero are fjeld and svalm2.
 
 Here we perform Boosting.
 
-```{r}
+```{r,eval = F}
 library(gbm)
 set.seed(50550)
 lambd <-  seq(0.001, 0.02, by=0.001)
@@ -484,7 +410,7 @@ Hfj
 
 Mögulega ættum við að hafa bara 3. Þau tala um það i verkefnalysingunni.
 
-```{r}
+```{r,eval = F}
 str(dat)
 dat = data.frame(dat,svfn)
 mats = dat$matssvaedi
@@ -506,7 +432,7 @@ dat.test = dat[-train,]
 
 ## Random Forest
 
-```{r}
+```{r,eval = F}
 library(randomForest)
 set.seed(4949)
 err = integer()
@@ -535,18 +461,123 @@ importance(fit.rf) #HERE we can see the most important variables
 
 ## Support Vector Machine
  
-```{r}
+```{r,eval = F}
 library(e1071)
 fit.svm = svm(svfn~.,data = dat.train,scale = T, kernel = "radial", cost = 200,gamma=0.1) #gamma
 pred.svm = predict(fit.svm,dat.test)
 err.svm = mean(pred.svm!=dat.test$svfn)
 err.svm
 
-tune.svm = tune(svm, svfn~.,data = dat.train, scale=T, kernel = "radial", ranges = list(cost = c(50,100,200), gamma = 0.1))#Cost 5, Gamma = 0.5
-summary(tune.svm)
+#tune.svm = tune(svm, svfn~.,data = dat.train, scale=T, kernel = "radial", ranges = list(cost = c(50,100,200), gamma = 0.1))#Cost 5, Gamma = 0.5
+#summary(tune.svm)
 
 fit.svm2 = svm(svfn~.,data = dat.train,scale = T, kernel = "radial", cost = 5,gamma=0.5)
 pred.svm2 = predict(fit.svm2,dat.test)
 err.svm2 = mean(pred.svm2 != dat.test$svfn)
 err.svm2
 ```
+
+### Appendix
+
+###Data preprocessing
+
+We start by removing all the data which is not in the capital region. 
+
+```{r, eval = F}
+capitalArea = c(0000,1000,1100,1300,1400,1604,1606)
+data = data[data$svfn %in% capitalArea,]
+```
+
+Now we are going to remove the variables that we won't be using.
+
+```{r, eval = F}
+delete = names(data)[c(1,2,5,6,7,10,11,12,13,14,15,17,18,19,20,21,
+                       25,26,30,37,38,40,41,42,44,47,50,52,53)]
+data = data[,-which(names(data) %in% delete)]
+```
+
+Some variable have many levels and few observations on some levels so we are going to remove those observations. 
+
+```{r, eval = F}
+#Einbylishus, Fjolbylishus, Ibudareign, Ibudarhus, Parhus, Radhus. Getum fækkað meira 
+lev = levels(data$teg_eign)[c(1,2,7,8,11)] 
+data = data[which(data$teg_eign %in% lev),]
+data$teg_eign = droplevels(data$teg_eign)
+
+data$matssvaedi = as.factor(data$matssvaedi)
+lev = levels(data$matssvaedi)[c(61,62)]
+data = data[-which(data$matssvaedi %in% lev),]
+data$matssvaedi = droplevels(data$matssvaedi)
+
+data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
+lev = levels(data$undirmatssvaedi)[c(10,36,38,39,50,55)]
+data = data[-which(data$undirmatssvaedi %in% lev),]
+data$undirmatssvaedi = droplevels(data$undirmatssvaedi)
+```
+
+Many of the numerical variables should be factors, and some factors should be numerical. We are also going to combine some of the levels for certain factors since the higher levels have very few observations in many cases.
+
+```{r, eval = F}
+data$svfn = as.factor(data$svfn)
+data$lyfta[which(data$lyfta != 0)] = 1
+data$lyfta = as.factor(data$lyfta)
+data$fjsturt[which(!(data$fjsturt %in% c(0,1)))] = 2
+data$fjsturt = as.factor(data$fjsturt)
+data$fjklos[which(!(data$fjklos %in% c(0,1)))] = 2
+data$fjklos = as.factor(data$fjklos)
+data$fjbkar[which(!(data$fjbkar %in% c(0,1)))] = 2
+data$fjbkar = as.factor(data$fjbkar)
+data$fjeld[which(!(data$fjeld %in% c(0,1)))] = 2
+data$fjeld = as.factor(data$fjeld)
+data$fjstof[which(!(data$fjstof %in% c(0,1)))] = 2
+data$fjstof = as.factor(data$fjstof)
+data$fjhaed = as.factor(data$fjhaed)
+data$fjherb[which(!(data$fjherb %in% c(0,1,2,3,4,5)))] = 6
+data$fjherb = as.factor(data$fjherb)
+data$svalm2 = as.numeric(data$svalm2)
+data$fjmib = as.factor(data$fjmib)
+data$ibteg = as.factor(data$ibteg)
+data$svfn = revalue(data$svfn, c("0"="Rvk","1000"="Kop",
+                                 "1100"="Sel","1300"="Grb",
+                                 "1400"="Hfj","1604"="Mos"))
+data$ibteg = revalue(data$ibteg, c("11"="1","12"="2"))
+data$byggar = droplevels(data$byggar)
+```
+
+We are going to change the kdagur variable so that we have the days since the property was bought. 
+
+```{r, eval = F}
+data$kdagur <- strptime(x = as.character(data$kdagur),
+                                format = "%d.%m.%Y")
+mydate <- as.Date("2018-04-01")
+data$kdagur <- as.Date(data$kdagur)
+data$kdagur <- as.numeric(mydate-data$kdagur)
+```
+
+And we're going to change the byggar variable into the age of the house in years. 
+
+```{r, eval = F}
+data$byggar <- 2018 - as.numeric(as.character(data$byggar))
+colnames(data)[5] = "aldur"
+```
+
+Now we remove 0 values for nuvirdi and check for NA values. 
+```{r, eval = F}
+noNuvirdi <- which(data$nuvirdi==0)
+data = data[-noNuvirdi,]
+dim(data) == dim(na.omit(data))
+```
+
+Now we'll check whether any of the numerical variables are highly correlated. 
+
+```{r, eval = F}
+X = with(data,cbind(kdagur,aldur,ummal,ibm2,stig10,bilskurm2,ntm2,svalm2,geymm2))
+cor(X)
+```
+
+The ibm2 and ntm2 have a very high correlation so I'm removing one of them. 
+
+```{r, eval = F}
+data$ntm2 = NULL 
+```
+

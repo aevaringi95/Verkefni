@@ -75,7 +75,7 @@ ibteg          | factor    | type of property          | 1(single-family), 2(apa
 
 ### Descriptive plots of the data
 
-We start by looking at the density of the Nuvirdi variable.  
+We start by looking at the density of the $\texttt{nuvirdi}$ variable.  
 
 ```{r}
 density1 <- ggplot(data,aes(nuvirdi))+
@@ -87,14 +87,14 @@ density2 <- ggplot(data,aes(log(nuvirdi)))+
 grid.arrange(density1,density2,nrow=2)
 ```
 
-It's evident that when we plot nuvirdi on a log scale it looks a lot more like the normal distribution, so we're going to log transform the response. 
+It's evident that when we plot $\texttt{nuvirdi}$ on a log scale it looks a lot more like the normal distribution, so we're going to log transform the response. 
 
 ```{r}
 data$nuvirdi = log(data$nuvirdi)
 ```
 
 
-Let's plot nuvirdi against some variables to see if there are any relationships. 
+Let's plot $\texttt{nuvirdi}$ against some variables to see if there are any relationships. 
 
 ```{r}
 p1 <- ggplot(data, aes(x=kdagur,y=nuvirdi)) +
@@ -133,7 +133,7 @@ grid.arrange(p1,p2,p3,p4,nrow = 2)
 grid.arrange(p5,p6,p7,p8,nrow = 2)
 ```
 
-It looks like geymm2, bilskurm2 and ibm2 might have a more linear relatioship with nuvirdi on a log scale. 
+It looks like $\texttt{geymm2}$, $\texttt{bilskurm2}$ and $\texttt{ibm2}$ might have a more linear relatioship with nuvirdi on a log scale. 
 
 ```{r}
 B = data$bilskurm2
@@ -161,7 +161,7 @@ p3 <- ggplot(data, aes(x=G,y=nuvirdi)) +
 grid.arrange(p1,p2,p3,nrow = 2)
 ```
 
-A log transformation is not suitable for the bilkskurm2 variable, but it definitely is for ibm2 and geymm2, although we will have to fix the values that are at zero. 
+A log transformation is not suitable for the $\texttt{bilskurm2}$ variable, but it definitely is for $\texttt{ibm2}$ and $\texttt{geymm2}$, although we will have to fix the values that are at zero. 
 
 ```{r}
 data$ibm2 = log(data$ibm)
@@ -219,7 +219,7 @@ grid.arrange(f1,f2,f3,
              f8,f9,f10,f11,f12,ncol=3)
 ```
 
-Most of the factor variables seem to have a relationship with nuvridi, especially fjmib, fjhaed and fjherb. 
+Most of the factor variables seem to have a relationship with $\texttt{nuvirdi}$, especially $\texttt{fjmib}$, $\texttt{fjhaed}$ and $\texttt{fjherb}$. 
 
 Finally, we'll check the correlation between the numerical variables. 
 
@@ -233,7 +233,7 @@ None of the variables are highly correlated.
 ### Modeling the data
 
 
-When exploring the data we realised that the svfn variable and the two matssvaedi variables are linearly dependent since they are describing the same thing. For the regression part we decided to use the matssvaedi variables and for the classification we are going to use the svfn variable. 
+When exploring the data we realised that the $\texttt{svfn}$ variable and the two $\texttt{matssvaedi}$ variables are linearly dependent since they are describing the same thing. For the regression part we decided to use the $\texttt{matssvaedi}$ variables and for the classification we are going to use the $\texttt{svfn}$ variable. 
 
 ```{r}
 set.seed(8756)
@@ -242,7 +242,7 @@ svfn = dat$svfn
 dat$svfn = NULL
 ```
 
-Now we'll split the data into a training and test set. 
+Now we'll split the data into a training set with 80% of the data and a test set. 
 
 ```{r}
 n = dim(dat)[1]
@@ -253,11 +253,19 @@ dat.test = dat[-train,]
 
 ## Linear Regression
 
-To start we are using linear regression to predict (the log of) nuvirdi. 
+To start we are using linear regression to predict (the log of) $\texttt{nuvirdi}$ 
 
 ```{r}
 fit.lm = lm(nuvirdi~.,dat.train)
 summary(fit.lm)
+```
+
+All of the numerical variables are significant and most of the factors have significant levels, apart from $\texttt{fjbkar}$ and $\texttt{fjklos}$.
+
+Er hægt að sjá hvort reference levelið sé significant?
+
+
+```{r}
 pred.lm = predict(fit.lm, dat.test)
 RSS1 = mean((dat.test$nuvirdi - pred.lm)^2)
 Rss = mean((exp(dat.test$nuvirdi)-exp(pred.lm))^2)
@@ -280,7 +288,8 @@ resPlot = ggplot(diagnost, aes(x=seq(1:length(.resid)),y=.resid)) +
                 geom_hline(yintercept=3*res_sd, col="green", linetype="dashed")+
                 geom_hline(yintercept=-3*res_sd, col="green", linetype="dashed")+
                 xlab("Index")+ylab("Residuals")+labs(title = "Index plot of residuals")+
-                geom_text(aes(label=ifelse(abs(.resid)>3*res_sd,.index,"")),hjust=-.5, vjust=0.4)+
+                geom_text(aes(label=ifelse(abs(.resid)>3*res_sd,.index,"")),
+                      hjust=-.5, vjust=0.4)+
                 theme_grey()
 resPlot
 ```
@@ -393,7 +402,6 @@ Rss2Boost = mean((exp(dat.test$nuvirdi) - exp(boost.pred))^2)
 
 Rss2Boost
 RssBoos
-
 ```
 
 

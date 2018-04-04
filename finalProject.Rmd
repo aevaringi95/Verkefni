@@ -28,7 +28,6 @@ We start by loading the data which has already been cleaned. The particulars of 
 
 ```{r}
 data = read.csv("MyData.csv")
-dataOriginal = data
 ```
 
 ```{r, echo = F}
@@ -44,6 +43,7 @@ data$fjstof = as.factor(data$fjstof)
 data$matssvaedi = as.factor(data$matssvaedi)
 data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
 data$ibteg = as.factor(data$ibteg)
+dataOriginal = data
 ```
 
 The data is now as follows: 

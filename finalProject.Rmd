@@ -232,12 +232,13 @@ cor(X)
 
 None of the variables are highly correlated. 
 
+
 ### Modeling the data
+
 
 When exploring the data we realised that the $\texttt{svfn}$ variable and the two $\texttt{matssvaedi}$ variables are linearly dependent since they are describing the same thing. For the regression part we decided to use the $\texttt{matssvaedi}$ variables and for the classification we are going to use the $\texttt{svfn}$ variable. 
 
 ```{r}
-set.seed(8756)
 dat = data
 datN = dataOriginal
 svfn = dat$svfn
@@ -249,6 +250,7 @@ datN$svfn = NULL
 Now we'll split the data into a training set with 80% of the data and a test set. 
 
 ```{r}
+set.seed(5040)
 n = dim(dat)[1]
 train = sample(n,floor(n*0.8)) 
 dat.train = dat[train,]
@@ -270,10 +272,12 @@ summary(fit.lm)
 All of the numerical variables are significant and most of the factors have significant levels, apart from $\texttt{fjbkar}$ and $\texttt{fjklos}$.
 
 ```{r}
-#þarf ekki að breyta datN svo breytur sem eiga að vera factor séu það?
 fitN.lm = lm(nuvirdi~.,datN.train)
 summary(fitN.lm)
 ```
+
+We can see that Adjusted R-squared is lower for $\texttt{Nuvirdi}$ not on log-scale. 
+
 
 ```{r}
 pred.lm = predict(fit.lm, dat.test)
@@ -332,13 +336,14 @@ LevPlot <- ggplot(diagnost, aes(x=seq(1:length(.hat)),y=.hat))+
 LevPlot
 ```
 
-Here we can see the Leverage plot. There seems to be one point that has very high leverage. This point is in undirmatssvæði 101 which has only 2 observations and there for it has this high leverage. So it doesn't mean that it's an outlier.
+Here we can see the Leverage plot. There seems to be few points that have very high leverage. These point should be looked at more closely to examine weather they are outliers or not.
+
 
 ## Lasso Regression
 
 Now we use Lasso regression to see if it improves the linear regression.
 
-```{r,eval = T}
+```{r,eval = F}
 ytrain = data.matrix(dat.train[,"nuvirdi"])
 Xtrain = data.matrix(dat.train[,!(colnames(dat.train) %in% c("nuvirdi"))])
 Xtest = data.matrix(dat.test[,!(colnames(dat.train) %in% c("nuvirdi"))])
@@ -349,21 +354,27 @@ plot(fit.lasso)
 
 From the plot above it seems that the best lambda has no zero predictors.
 
-```{r,eval = T}
+
+```{r,eval = F}
 best.lambda = fit.lasso$lambda.min
 pred.lasso = predict(fit.lasso,Xtest,s=best.lambda)
 RssLasso = mean((exp(dat.test$nuvirdi)-exp(pred.lasso))^2)
 RssLasso
+
 ```
 
 Here we can see that when we do Lasso regression the MSE is much higher then for a normal linear regression.
 
-```{r,eval = T}
+
+```{r,eval = F}
 best.model = glmnet(Xtrain, ytrain, alpha = 1)
 predict(best.model, s = fit.lasso$lambda.1se, type = "coefficients")
 ```
 
 The first two predictors that tend to zero are $\texttt{fjeld}$ and $\texttt{svalm2}$.
+
+
+Now we fit a Lasso model on the normal data.
 
 ```{r}
 ytrainN = data.matrix(datN.train[,"nuvirdi"])
@@ -377,51 +388,78 @@ RssLassoN = mean((datN.test$nuvirdi - predN.lasso)^2)
 RssLassoN
 ```
 
+
+
 ##Boosting
 
 Here we perform our second method in regression to predict $\texttt{nuvirdi}$
 
-```{r,eval = T}
-set.seed(50550)
+```{r,eval = F}
+library(gbm)
+set.seed(5040)
 lambd <-  seq(0.001, 0.02, by=0.001)
 lambd <- c(lambd, seq(0.02, 0.5, by=0.01))
 m <- length(lambd)
 testErr <- rep(NA, m)
+testErrN <- rep(NA, m)
 for (i in 1:m) {
-    boostCol <- gbm(nuvirdi ~ ., data = dat.train,
+    boostCol = gbm(nuvirdi ~ ., data = dat.train,
                     distribution = "gaussian",
                     n.trees = 200, 
                     shrinkage = lambd[i])
-    testPred <- predict(boostCol, dat.test, n.trees = 200)
+    testPred = predict(boostCol, dat.test, n.trees = 200)
     testErr[i] = mean((dat.test$nuvirdi - testPred)^2)
+    boostColN = gbm(nuvirdi ~ ., data = datN.train,
+                    distribution = "gaussian",
+                    n.trees = 200, 
+                    shrinkage = lambd[i])
+    testPredN = predict(boostColN, datN.test, n.trees = 200)
+    testErrN[i] = mean((datN.test$nuvirdi - testPredN)^2)
     print(i)
 }
 
 bestLam = lambd[which.min(testErr)]
+bestLamN = lambd[which.min(testErrN)]
 
-ggplot(data.frame(x=lambd, y=testErr), aes(x=x, y=y)) +
-      xlab("Shrinkage") + 
-      ylab("Test MSE") + 
-      geom_point()
+boostPlot =ggplot(data.frame(x=lambd, y=testErr), aes(x=x, y=y)) +
+            xlab("Shrinkage") + 
+            ylab("Test MSE") + 
+            geom_point()
+
+boostPlot2 = ggplot(data.frame(x=lambd, y=testErrN), aes(x=x, y=y)) +
+              xlab("Shrinkage") + 
+              ylab("Test MSE(Normal)") + 
+              geom_point()
+
+grid.arrange(boostPlot,
+             boostPlot2,ncol=2)
+
 ```
 
-From the plot above we are trying to find the best shrinkage parameter lambda. We get that it's $\lambda=0.26$. So we fit a boosting model using 1000 trees with $\lambda=0.26$.
+From the plot above we are trying to find the best shrinkage parameter lambda. We get that it's $\lambda=0.27$ for the transformed data and $\lambda=0.22$ for the normal data. Now we fit a boosting model using 1000 trees with these $\lambda$.
 
-```{r,eval = T}
-boost.fit <- gbm(nuvirdi ~ ., data = dat.train, distribution = "gaussian", 
+```{r,eval = F}
+set.seed(5040)
+boost.fit <- gbm(nuvirdi ~ ., data = dat.train, distribution = "gaussian",
                  n.trees = 1000, shrinkage =bestLam )
 boost.pred <- predict(boost.fit, dat.test, n.trees = 1000)
 RssBoost = mean((exp(dat.test$nuvirdi) - exp(boost.pred))^2)
+
 RssBoost
 
-boostN.fit <- gbm(nuvirdi ~ ., data = datN.train, distribution = "gaussian", 
-                  n.trees = 1000, shrinkage =bestLam )
+
+
+boostN.fit <- gbm(nuvirdi ~ ., data = datN.train, distribution = "gaussian",
+                  n.trees = 1000, shrinkage =bestLamN )
 boostN.pred <- predict(boostN.fit, datN.test, n.trees = 1000)
 RssBoostN = mean((datN.test$nuvirdi - boostN.pred)^2)
+
 RssBoostN
 ```
 
+
 ```{r}
+library(knitr)
 linear_summary <- c(RssLin,RssLinN) 
 lasso_summary <- c(RssLasso,RssLassoN) 
 boost_summary <- c(RssBoost,RssBoostN) 
@@ -432,11 +470,11 @@ colnames(table) <- c("MSE (Log)","MSE Normal")
 kable(round(table,6),caption = "Summary of MSE from the methods")
 ```
 
-From the table above we can see that Boosting is doing the best job in predicting Nuvirdi.
+From the table above we can see that Boosting and linear regression on the transformed data are doing the best job in predicting nuvirdi.
 
 ### Classification 
 
-Here we are going to predict in which town(Svfn) the properties belong to. We start by taking only properties from Reykjavik,kopavogi and Hafnarfirði.
+Here we are going to predict in which town(Svfn) the properties belong to. We start by taking only properties from Reykjavik, Kopavogi and Hafnarfirði.
 The classes are 
 Rvk
 Kop
@@ -473,6 +511,7 @@ n = dim(dat)[1]
 p = dim(dat)[2]
 train = sample(n,floor(n*0.8))
 
+
 dat.train = dat[train,]
 dat.test = dat[-train,]
 datN.train=datN[train,]
@@ -480,13 +519,14 @@ datN.test = datN[-train,]
 
 n2 = dim(dat.train)[1]
 val = sample(n2,floor(n2*0.8))
-dat.train = dat.train[val,]
 dat.val = dat.train[-val,]
-datN.train = datN.train[val,]
+dat.train = dat.train[val,]
 datN.val = datN.train[-val,]
+datN.train = datN.train[val,]
 ```
 
 We also split to a train set, test set and a validation set to use in cross validation for SVM.
+
 
 ```{r}
 table(dat$svfn)
@@ -500,18 +540,19 @@ First we use Random Forest to try and classify into these three groups.
 
 We start by finding the number m which is the sample of random predictors that is chosen as split candidates in each split.
 
-```{r,eval = F}
+```{r}
+library(randomForest)
 set.seed(5040)
 err = integer()
 errN = integer()
 mtrys = seq(from = 2, to = 20, by = 1)
 for(i in mtrys){
   fit.rf = randomForest(svfn~., dat.train, mtry = i, ntree = 200) 
-  pred.rf = predict(fit.rf, dat.test)
-  err[i-1] = mean(dat.test$svfn != pred.rf)
+  pred.rf = predict(fit.rf, dat.val)
+  err[i-1] = mean(dat.val$svfn != pred.rf)
   fitN.rf = randomForest(svfn~., datN.train, mtry = i, ntree = 200)
-  predN.rf = predict(fitN.rf, datN.test)
-  errN[i-1] = mean(datN.test$svfn != predN.rf)  
+  predN.rf = predict(fitN.rf, datN.val)
+  errN[i-1] = mean(datN.val$svfn != predN.rf)  
   print(i)
 }
 
@@ -525,12 +566,14 @@ RFNor = ggplot(data=data.frame(x=mtrys,y=errN),aes(x=x,y=y))+
         ylab("Misclassification Error(Normal)")+
         geom_point()
 
+
 grid.arrange(RFlog,RFNor,ncol=2)
 ```
 
 Here we can see the corresponding Missclassification Error for different values of m.
 
-```{r,eval = F}
+
+```{r}
 minErr = which.min(err)
 fit.rf = randomForest(svfn~., dat.train, mtry =minErr+1, ntree = 200)
 pred.rf = predict(fit.rf, dat.test)
@@ -541,10 +584,14 @@ minErrN = which.min(errN)
 fitN.rf = randomForest(svfn~., datN.train, mtry =minErrN+1, ntree = 200)
 predN.rf = predict(fitN.rf, datN.test)
 misErrN = mean(datN.test$svfn != predN.rf)
+
 misErrN
+
 ```
 
-```{r,eval = F}
+
+
+```{r}
 fit.rf
 importance(fit.rf)
 ```
@@ -557,11 +604,15 @@ Ummal
 Ibm2
 Nuvirdi
 
+
+
 ## Support Vector Machine
 
 Here we use SVM without a kernel and with radial kernel to try and classify. The svm function from the e1071 library uses the One-versus-one classification. We start by using the validation set to choose C and then $\gamma$ for the radial kernal. We also scale the data for the SVM because it gave a better result.
 
-```{r, eval = F}
+
+```{r}
+library(e1071)
 set.seed(5040)
 
 tune.svm = tune(svm, svfn~.,
@@ -570,16 +621,18 @@ tune.svm = tune(svm, svfn~.,
                 ranges = list(cost = c(1,10,50,100,200,300)))  
 summary(tune.svm)
 
+
 tuneN.svm = tune(svm, svfn~.,
                 data = datN.val,
                 scale=T, 
                 ranges = list(cost = c(1,10,50,100,200,300)))  
 summary(tuneN.svm)
+
 ```
 
 Here we can see that $C=300$ gives the best result for both data sets. Let's fit a model with $C=300$ on the training set.
 
-```{r, eval = F}
+```{r}
 fit.svm = svm(svfn~.,
               data = dat.train,
               scale = T,
@@ -588,49 +641,54 @@ pred.svm = predict(fit.svm,dat.test)
 err.svm = mean(pred.svm!=dat.test$svfn)
 err.svm
 
+
 fitN.svm = svm(svfn~.,
               data = datN.train,
               scale = T,
-              cost = 300)
+              cost = 100)
 predN.svm = predict(fitN.svm,datN.test)
 errN.svm = mean(predN.svm!=datN.test$svfn)
 errN.svm
 ```
 
+
 Below is the confusion matrix for the transformed data.
 
-```{r, eval = F}
+```{r}
 table(pred.svm,dat.test$svfn)
 ```
  
+ 
 Here we fit a model with radial kernel. Let's use the validation set to choose the parameters.
 
-```{r,eval = F}
+```{r}
 set.seed(5040)
 tune.svm2 = tune(svm, svfn~.,
                 data = dat.val,
                 scale=T,
                 kernel="radial",
-                ranges = list(gamma=c(0.01,0.1,0.5),cost = c(50,100,200,300))) 
+                ranges = list(gamma=c(0.1,0.5),cost = c(50,100,200,300))) 
 summary(tune.svm2)
 
 tuneN.svm2 = tune(svm, svfn~.,
                 data = datN.val,
                 scale=T,
                 kernel="radial",
-                ranges = list(gamma=c(0.01,0.1,0.5),cost = c(50,100,200,300))) 
+                ranges = list(gamma=c(0.1,0.5),cost = c(50,100,200,300))) 
 summary(tuneN.svm2)
+
 ```
 
-Here we can see that $\gamma=0.1$ and $C=50$ gives the best . Let's fit a model with these parameters.
+Here we can see that $\gamma=0.1$ and $C=300$ gives the best result for both transformed data and normal. Let's fit a model with these parameters.
 
-```{r, eval = F}
+```{r}
+set.seed(5040)
 fit.svm2 = svm(svfn~.,
               data = dat.train,
               scale = T,
               kernel="radial",
               gamma = 0.1,
-              cost = 200)
+              cost = 300)
 pred.svm2 = predict(fit.svm2,dat.test)
 err.svm2 = mean(pred.svm2!=dat.test$svfn)
 err.svm2
@@ -640,23 +698,21 @@ fitN.svm2 = svm(svfn~.,
               scale = T,
               kernel="radial",
               gamma = 0.1,
-              cost = 200)
+              cost = 300)
 predN.svm2 = predict(fitN.svm2,datN.test)
 errN.svm2 = mean(predN.svm2!=datN.test$svfn)
 errN.svm2
 ```
 
-For SVM with a radial kernel we get missclassification error rate : 21.19%
-
 Below we can see the confusion matrix
 
-```{r, eval = F}
+```{r}
 table(pred.svm2,dat.test$svfn)
 ```
 
 Here is the summary of the classification methods. Random Forest is doing a much better job then SVM. It seems that SVM is not doing a good job for this data set.
 
-```{r, eval = F}
+```{r}
 Random_summary <- c(misErr,misErrN) 
 WithoutSVM_summary <- c(err.svm,errN.svm) 
 WithSVM_summary <- c(err.svm2,errN.svm2) 
@@ -666,6 +722,7 @@ rownames(table) <- c("Random Forest","SVM without Kernel", "SVM with radial")
 colnames(table) <- c("Missclassification error(Log)","Misclassification error(Normal)")
 kable(round(table,6),caption = "Summary of MisClas error from the methods")
 ```
+
 
 ### Appendix
 

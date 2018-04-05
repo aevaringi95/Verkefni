@@ -673,7 +673,32 @@ summary(tuneN.svm2)
 
 ```
 
-Here we can see that $\gamma=0.1$ and $C=300$ gives the best result for both transformed data and normal. Let's fit a model with these parameters.
+Here we can see that $\gamma=0.05$ and $C=50$ gives the best result for both transformed data and normal. Let's fit a model with these parameters.
+
+```{r}
+set.seed(5040)
+fit.svm2 = svm(svfn~.,
+              data = dat.train,
+              scale = T,
+              kernel="radial",
+              gamma = 0.05,
+              cost = 50)
+pred.svm2 = predict(fit.svm2,dat.test)
+err.svm2 = mean(pred.svm2!=dat.test$svfn)
+err.svm2
+
+fitN.svm2 = svm(svfn~.,
+              data = datN.train,
+              scale = T,
+              kernel="radial",
+              gamma = 0.05,
+              cost = 50)
+predN.svm2 = predict(fitN.svm2,datN.test)
+errN.svm2 = mean(predN.svm2!=datN.test$svfn)
+errN.svm2
+```
+
+We also tried using $\gamma=0.1$ and $C=300$ and that gave a better result.
 
 ```{r}
 set.seed(5040)

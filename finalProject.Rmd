@@ -267,29 +267,32 @@ fit.lm = lm(nuvirdi~.,dat.train)
 summary(fit.lm)
 ```
 
-All of the numerical variables are significant and most of the factors have significant levels, apart from $\texttt{fjbkar}$ and $\texttt{fjklos}$.
+All of the numerical variables are significant and most of the factors have significant levels, apart from $\texttt{fjbkar}$ and $\texttt{fjeld}$. The $R^2$-adjusted for this model is $0.9086$.
+
+Now we'll do the same for the non-transformed data. 
 
 ```{r}
 fitN.lm = lm(nuvirdi~.,datN.train)
 summary(fitN.lm)
 ```
 
-We can see that Adjusted R-squared is lower for $\texttt{Nuvirdi}$ not on log-scale. 
+Now all the variables are significant, however the $R^2$-adjusted as dropped to $0.8598$. 
 
+Finally we will calculated the MSE for the two models. 
 
 ```{r}
 pred.lm = predict(fit.lm, dat.test)
 RssLin = mean((exp(dat.test$nuvirdi)-exp(pred.lm))^2)
-RssLin
 
 predN.lm = predict(fitN.lm, datN.test)
 RssLinN = mean((datN.test$nuvirdi - predN.lm)^2)
-RssLinN
 ```
+
+The MSE for the first model is `r RssLin` and `r RssLinN` for the second model. THerefore it's clear that a log transformation is suitable when performing linear regression on this data.
 
 # Diagnostics of linear regression
 
-Here below we can see some plots for the linear regression model(Log scaled).
+Here below we can see some plots for the linear regression model (log scaled).
 
 ```{r}
 diagnost = fortify(fit.lm)
@@ -320,7 +323,7 @@ QQPlot<-ggplot(diagnost, aes(sample = .resid))+
 QQPlot
 ```
 
-Here we can see the normal Q-Q plot for the model. It looks good and they seem to follow a normal distribution but the ends are more spread out they are heavy tailed.
+Here we can see the normal Q-Q plot for the model. It looks good and they seem to follow a normal distribution but the ends are quite spread out so the distribution is heavy tailed. 
 
 ```{r}
 LevPlot <- ggplot(diagnost, aes(x=seq(1:length(.hat)),y=.hat))+
@@ -358,11 +361,9 @@ From the plot above it seems that the best lambda has no zero predictors.
 best.lambda = fit.lasso$lambda.min
 pred.lasso = predict(fit.lasso,Xtest,s=best.lambda)
 RssLasso = mean((exp(dat.test$nuvirdi)-exp(pred.lasso))^2)
-RssLasso
-
 ```
 
-Here we can see that when we do Lasso regression the MSE is much higher then for a normal linear regression.
+The best $\lambda$ is `r best.lambda` which is very small so there is not much penalty on the size of coefficients. The corresponding MSE is`r RssLasso` which is much higher than we got for linear regression. 
 
 
 ```{r,eval = T}
@@ -370,7 +371,7 @@ best.model = glmnet(Xtrain, ytrain, alpha = 1)
 predict(best.model, s = fit.lasso$lambda.1se, type = "coefficients")
 ```
 
-The first three predictors that tend to zero are $\texttt{fjeld}$,$\texttt{fjstof}$ and $\texttt{svalm2}$.
+The first three predictors that tend to zero are $\texttt{fjeld}$, $\texttt{fjstof}$ and $\texttt{svalm2}$.
 
 
 Now we fit a Lasso model on the normal data.
@@ -385,14 +386,14 @@ fitN.lasso = cv.glmnet(XtrainN,ytrainN,alpha=1, lambda=grid, thresh=1e-12)
 bestN.lambda = fitN.lasso$lambda.min
 predN.lasso = predict(fitN.lasso,XtestN,s=bestN.lambda)
 RssLassoN = mean((datN.test$nuvirdi - predN.lasso)^2)
-RssLassoN
 ```
 
+Here we get $\lambda =$ `r bestN.lambda` and the MSE for this model is `r RssLassoN` so a little higher than for the log-scaled data. 
 
 
 ##Boosting
 
-Here we perform our second method in regression to predict $\texttt{nuvirdi}$
+Here we perform our final method in regression to predict $\texttt{nuvirdi}$. We start by checking which values of lambda gives us the best error. We do this simultaneously for the tranformed and untransformed data.  
 
 ```{r,eval = T}
 set.seed(5040)
@@ -414,7 +415,6 @@ for (i in 1:m) {
                     shrinkage = lambd[i])
     testPredN = predict(boostColN, datN.test, n.trees = 200)
     testErrN[i] = mean((datN.test$nuvirdi - testPredN)^2)
-    print(i)
 }
 
 bestLam = lambd[which.min(testErr)]
@@ -432,10 +432,10 @@ boostPlot2 = ggplot(data.frame(x=lambd, y=testErrN), aes(x=x, y=y)) +
 
 grid.arrange(boostPlot,
              boostPlot2,ncol=2)
-
 ```
 
-From the plot above we can see how the MSE decreases as a function of $\lambda$ . We get that the lowest $\lambda$ for the transformed data it's $\lambda=0.3$. For the normal data it's $\lambda=0.15$. Now we fit a boosting model using 1000 trees with these $\lambda$.
+
+From the plot above we can see how the MSE decreases as a function of $\lambda$ and then increases slightly again. We get that the lowest $\lambda$ for the transformed data it's $\lambda=0.33$. For the normal data it's $\lambda=0.15$. Now we fit a boosting model using 1000 trees with these $\lambda$.
 
 ```{r,eval = T}
 set.seed(5040)
@@ -443,16 +443,20 @@ boost.fit <- gbm(nuvirdi ~ ., data = dat.train, distribution = "gaussian",
                  n.trees = 1000, shrinkage =bestLam )
 boost.pred <- predict(boost.fit, dat.test, n.trees = 1000)
 RssBoost = mean((exp(dat.test$nuvirdi) - exp(boost.pred))^2)
+```
 
-RssBoost
+The MSE for the Boosting model is `r RssBoost` which is the lowest we've seen so far. 
 
+Now we repeat this on the untransformed data. 
+
+```{r}
 boostN.fit <- gbm(nuvirdi ~ ., data = datN.train, distribution = "gaussian",
                   n.trees = 1000, shrinkage =bestLamN )
 boostN.pred <- predict(boostN.fit, datN.test, n.trees = 1000)
 RssBoostN = mean((datN.test$nuvirdi - boostN.pred)^2)
-
-RssBoostN
 ```
+
+Now we get en MSe of `r RssBoostN` which is a lot higher than for the transformed data. 
 
 
 ```{r}
@@ -466,15 +470,19 @@ colnames(table) <- c("MSE (Log)","MSE Normal")
 kable(round(table,6),caption = "Summary of MSE from the methods")
 ```
 
-From the table above we can see that Boosting and linear regression on the transformed data are doing the best job in predicting nuvirdi.
+From the table above we can see that Boosting and linear regression on the transformed data are doing the best job in predicting $\texttt{nuvirdi}$
 
 ### Classification 
 
-Here we are going to predict in which town(Svfn) the properties belong to. We start by taking only properties from Reykjavik, Kopavogi and Hafnarfirði.
-The classes are 
-Rvk
-Kop
-Hfj
+Here we are going to predict in which town ($\texttt{svfn}$) the properties belong are. We start by taking only properties from Reykjavik, Kopavogi and Hafnarfirði.
+
+So the classes are 
+
+- Rvk
+- Kop
+- Hfj
+
+Now we add the $\texttt{svfn}$ variable back to the data frame and remove the $\texttt{matssvaedi}$ variables. 
 
 ```{r}
 dat = data.frame(dat,svfn)
@@ -499,14 +507,11 @@ datN = datN[which(data$svfn %in% area),]
 datN$svfn = droplevels(datN$svfn)
 ```
 
-Here we take out Matssvæði and undirmatsvæði because they are describing the same thing as Svfn.
-
 ```{r}
 set.seed(5040)
 n = dim(dat)[1]
 p = dim(dat)[2]
 train = sample(n,floor(n*0.8))
-
 
 dat.train = dat[train,]
 dat.test = dat[-train,]
@@ -523,7 +528,6 @@ datN.train = datN.train[val,]
 
 We also split to a train set, test set and a validation set to use in cross validation for SVM.
 
-
 ```{r}
 table(dat$svfn)
 ```
@@ -534,10 +538,9 @@ We can see that most of the properties are in Reykjavik.
 
 First we use Random Forest to try and classify into these three groups.
 
-We start by finding the number m which is the sample of random predictors that is chosen as split candidates in each split.
+We start by finding the  tuning parameter $m$ which is the sample of random predictors that is chosen as split candidates in each split.
 
 ```{r}
-library(randomForest)
 set.seed(5040)
 err = integer()
 errN = integer()
@@ -565,66 +568,67 @@ RFNor = ggplot(data=data.frame(x=mtrys,y=errN),aes(x=x,y=y))+
 grid.arrange(RFlog,RFNor,ncol=2)
 ```
 
-Here we can see the corresponding Missclassification Error for different values of m. Let's fit a model with m that gives the lowest misclassification errror.
-
+Here we can see the missclassification error for different values of $m$. 
 
 ```{r}
 minErr = which.min(err)
+minErrN = which.min(errN)
+```
+
+The lowest error for the log-scaled data is at $m = $`r minErr` and at $m = $`r minErrN` for the normal data. 
+
+```{r}
 fit.rf = randomForest(svfn~., dat.train, mtry =minErr+1, ntree = 200)
 pred.rf = predict(fit.rf, dat.test)
 misErr = mean(dat.test$svfn != pred.rf)
-misErr
+```
 
-minErrN = which.min(errN)
+The misclassification error for this model is `r misErr`.
+
+```{r}
 fitN.rf = randomForest(svfn~., datN.train, mtry =minErrN+1, ntree = 200)
 predN.rf = predict(fitN.rf, datN.test)
 misErrN = mean(datN.test$svfn != predN.rf)
-
-misErrN
-
 ```
 
-
+The error for the normal data is `r misErrN` which is almost identical to the first model. 
 
 ```{r}
 fit.rf
+```
+
+Here we can see both the confusion matrix for the model on the transformed data. 
+
+```{r}
 importance(fit.rf)
 ```
 
-Here we can see both the confusion matrix and the most important variables for the classification.
-
-The most important variables are:
-Aldur
-Ummal
-Ibm2
-Nuvirdi
-
+The most important variables are $\texttt{aldur}$, $\texttt{ummal}$ and $\texttt{ibm2}$. 
 
 
 ## Support Vector Machine
 
-Here we use SVM without a kernel and with radial kernel to try and classify. The svm function from the e1071 library uses the One-versus-one classification. We start by using the validation set to choose C and then $\gamma$ for the radial kernal. We also scale the data for the SVM because it gave a better result.
+Here we use SVM without a kernel and with a radial kernel to classify. The $\texttt{svm()}$ function from the $\texttt{e1071}$ library uses the One-versus-one classification. We start by using the validation set to choose C and then $\gamma$ for the radial kernel. We also scale the data for the SVM because it gives a better result.
 
+# Without Kernel
 
 ```{r}
 set.seed(5040)
-
 tune.svm = tune(svm, svfn~.,
                 data = dat.val,
                 scale=T, 
                 ranges = list(cost = c(1,10,50,100,200,300)))  
-summary(tune.svm)
-
 
 tuneN.svm = tune(svm, svfn~.,
                 data = datN.val,
                 scale=T, 
                 ranges = list(cost = c(1,10,50,100,200,300)))  
-summary(tuneN.svm)
 
+summary(tune.svm)
+summary(tuneN.svm)
 ```
 
-Here we can see that $C=300$ gives the best result for both data sets. Let's fit a model with $C=300$ on the training set.
+Here we can see that $C=100$ gives the best result for both data sets. Let's fit a model with $C=100$ on the training set.
 
 ```{r}
 fit.svm = svm(svfn~.,
@@ -633,8 +637,6 @@ fit.svm = svm(svfn~.,
               cost = 100)
 pred.svm = predict(fit.svm,dat.test)
 err.svm = mean(pred.svm!=dat.test$svfn)
-err.svm
-
 
 fitN.svm = svm(svfn~.,
               data = datN.train,
@@ -642,9 +644,9 @@ fitN.svm = svm(svfn~.,
               cost = 100)
 predN.svm = predict(fitN.svm,datN.test)
 errN.svm = mean(predN.svm!=datN.test$svfn)
-errN.svm
 ```
 
+The misclassification error for the log-scaled data is `r err.svm` and `r errN.svm` for the normal data. 
 
 Below is the confusion matrix for the transformed data.
 
@@ -652,8 +654,9 @@ Below is the confusion matrix for the transformed data.
 table(pred.svm,dat.test$svfn)
 ```
  
- 
-Here we fit a model with radial kernel. Let's use the validation set to choose the parameters.
+# Radial Kernel
+
+Now we are going to use a radial kernel. Let's use the validation set to choose the parameters.
 
 ```{r}
 set.seed(5040)
@@ -662,15 +665,15 @@ tune.svm2 = tune(svm, svfn~.,
                 scale=T,
                 kernel="radial",
                 ranges = list(gamma=c(0.05,0.1,0.5),cost = c(50,100,200,300))) 
-summary(tune.svm2)
 
 tuneN.svm2 = tune(svm, svfn~.,
                 data = datN.val,
                 scale=T,
                 kernel="radial",
                 ranges = list(gamma=c(0.05,0.1,0.5),cost = c(50,100,200,300))) 
-summary(tuneN.svm2)
 
+summary(tune.svm2)
+summary(tuneN.svm2)
 ```
 
 Here we can see that $\gamma=0.05$ and $C=50$ gives the best result for both transformed data and normal. Let's fit a model with these parameters.
@@ -685,7 +688,6 @@ fit.svm2 = svm(svfn~.,
               cost = 50)
 pred.svm2 = predict(fit.svm2,dat.test)
 err.svm2 = mean(pred.svm2!=dat.test$svfn)
-err.svm2
 
 fitN.svm2 = svm(svfn~.,
               data = datN.train,
@@ -695,38 +697,40 @@ fitN.svm2 = svm(svfn~.,
               cost = 50)
 predN.svm2 = predict(fitN.svm2,datN.test)
 errN.svm2 = mean(predN.svm2!=datN.test$svfn)
-errN.svm2
 ```
 
-We also tried using $\gamma=0.1$ and $C=300$ and that gave a better result.
+The error for the log-transformed data is `r err.svm2` and `r errN.svm2` for the normal data. 
+
+We tried using different values for $C$ and $\gamma$ and actually got better results even though the $\tune()$ function found other values. Perhaps the validation set is too small. When we use $C= 300$ and $\gamma = 0.1$ we get the following results. 
 
 ```{r}
-set.seed(5040)
-fit.svm2 = svm(svfn~.,
+fit.svm3 = svm(svfn~.,
               data = dat.train,
               scale = T,
               kernel="radial",
               gamma = 0.1,
               cost = 300)
-pred.svm2 = predict(fit.svm2,dat.test)
-err.svm2 = mean(pred.svm2!=dat.test$svfn)
-err.svm2
+pred.svm3 = predict(fit.svm3,dat.test)
+err.svm3 = mean(pred.svm3!=dat.test$svfn)
 
-fitN.svm2 = svm(svfn~.,
+fitN.svm3 = svm(svfn~.,
               data = datN.train,
               scale = T,
               kernel="radial",
               gamma = 0.1,
               cost = 300)
-predN.svm2 = predict(fitN.svm2,datN.test)
-errN.svm2 = mean(predN.svm2!=datN.test$svfn)
-errN.svm2
+predN.svm3 = predict(fitN.svm3,datN.test)
+errN.svm3 = mean(predN.svm3!=datN.test$svfn)
+err.svm3
+errN.svm3
 ```
+
+Now there errors are `r err.svm3` and `r errN.svm3` respectively which is better than when using $C$ and $\gamma$ from the $\texttt{tune()}$ function. 
 
 Below we can see the confusion matrix
 
 ```{r}
-table(pred.svm2,dat.test$svfn)
+table(pred.svm3,dat.test$svfn)
 ```
 
 Here is the summary of the classification methods. Random Forest is doing a much better job then SVM. It seems that SVM is not doing a good job for this data set.
@@ -734,7 +738,7 @@ Here is the summary of the classification methods. Random Forest is doing a much
 ```{r}
 Random_summary <- c(misErr,misErrN) 
 WithoutSVM_summary <- c(err.svm,errN.svm) 
-WithSVM_summary <- c(err.svm2,errN.svm2) 
+WithSVM_summary <- c(err.svm3,errN.svm3) 
 
 table <- rbind(Random_summary,WithoutSVM_summary,WithSVM_summary)
 rownames(table) <- c("Random Forest","SVM without Kernel", "SVM with radial") 

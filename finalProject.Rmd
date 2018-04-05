@@ -166,8 +166,6 @@ A log transformation is not suitable for the $\texttt{bilskurm2}$ variable, but 
 
 ```{r}
 data$ibm2 = log(data$ibm)
-#breytti þessu þannig að allt er jákvætt. 
-#G[ind3] = G[ind3] - 1.8 
 G[-ind3] = G[-ind3] + 1.7
 data$geymm2 = G
 ggplot(data, aes(x=geymm2,y=nuvirdi)) +
@@ -236,7 +234,7 @@ None of the variables are highly correlated.
 ### Modeling the data
 
 
-When exploring the data we realised that the $\texttt{svfn}$ variable and the two $\texttt{matssvaedi}$ variables are linearly dependent since they are describing the same thing. For the regression part we decided to use the $\texttt{matssvaedi}$ variables and for the classification we are going to use the $\texttt{svfn}$ variable. 
+When exploring the data we realised that the $\texttt{svfn}$ variable and the two $\texttt{matssvaedi}$ variables are linearly dependent since they are describing the same thing. For the regression part we decided to use the $\texttt{matssvaedi}$ variables and for the classification we are going to use the $\texttt{svfn}$ variable. We will evaluate both data sets, transformed(Log scaled) and normal.
 
 ```{r}
 dat = data
@@ -343,7 +341,8 @@ Here we can see the Leverage plot. There seems to be few points that have very h
 
 Now we use Lasso regression to see if it improves the linear regression.
 
-```{r,eval = F}
+```{r,eval = T}
+set.seed(5040)
 ytrain = data.matrix(dat.train[,"nuvirdi"])
 Xtrain = data.matrix(dat.train[,!(colnames(dat.train) %in% c("nuvirdi"))])
 Xtest = data.matrix(dat.test[,!(colnames(dat.train) %in% c("nuvirdi"))])
@@ -355,7 +354,7 @@ plot(fit.lasso)
 From the plot above it seems that the best lambda has no zero predictors.
 
 
-```{r,eval = F}
+```{r,eval = T}
 best.lambda = fit.lasso$lambda.min
 pred.lasso = predict(fit.lasso,Xtest,s=best.lambda)
 RssLasso = mean((exp(dat.test$nuvirdi)-exp(pred.lasso))^2)
@@ -366,17 +365,18 @@ RssLasso
 Here we can see that when we do Lasso regression the MSE is much higher then for a normal linear regression.
 
 
-```{r,eval = F}
+```{r,eval = T}
 best.model = glmnet(Xtrain, ytrain, alpha = 1)
 predict(best.model, s = fit.lasso$lambda.1se, type = "coefficients")
 ```
 
-The first two predictors that tend to zero are $\texttt{fjeld}$ and $\texttt{svalm2}$.
+The first three predictors that tend to zero are $\texttt{fjeld}$,$\texttt{fjstof}$ and $\texttt{svalm2}$.
 
 
 Now we fit a Lasso model on the normal data.
 
 ```{r}
+set.seed(5040)
 ytrainN = data.matrix(datN.train[,"nuvirdi"])
 XtrainN = data.matrix(datN.train[,!(colnames(dat.train) %in% c("nuvirdi"))])
 XtestN = data.matrix(datN.test[,!(colnames(dat.train) %in% c("nuvirdi"))])
@@ -394,8 +394,7 @@ RssLassoN
 
 Here we perform our second method in regression to predict $\texttt{nuvirdi}$
 
-```{r,eval = F}
-library(gbm)
+```{r,eval = T}
 set.seed(5040)
 lambd <-  seq(0.001, 0.02, by=0.001)
 lambd <- c(lambd, seq(0.02, 0.5, by=0.01))
@@ -408,7 +407,7 @@ for (i in 1:m) {
                     n.trees = 200, 
                     shrinkage = lambd[i])
     testPred = predict(boostCol, dat.test, n.trees = 200)
-    testErr[i] = mean((dat.test$nuvirdi - testPred)^2)
+    testErr[i] = mean((exp(dat.test$nuvirdi) - exp(testPred))^2)
     boostColN = gbm(nuvirdi ~ ., data = datN.train,
                     distribution = "gaussian",
                     n.trees = 200, 
@@ -436,9 +435,9 @@ grid.arrange(boostPlot,
 
 ```
 
-From the plot above we are trying to find the best shrinkage parameter lambda. We get that it's $\lambda=0.27$ for the transformed data and $\lambda=0.22$ for the normal data. Now we fit a boosting model using 1000 trees with these $\lambda$.
+From the plot above we can see how the MSE decreases as a function of $\lambda$ . We get that the lowest $\lambda$ for the transformed data it's $\lambda=0.3$. For the normal data it's $\lambda=0.15$. Now we fit a boosting model using 1000 trees with these $\lambda$.
 
-```{r,eval = F}
+```{r,eval = T}
 set.seed(5040)
 boost.fit <- gbm(nuvirdi ~ ., data = dat.train, distribution = "gaussian",
                  n.trees = 1000, shrinkage =bestLam )
@@ -446,8 +445,6 @@ boost.pred <- predict(boost.fit, dat.test, n.trees = 1000)
 RssBoost = mean((exp(dat.test$nuvirdi) - exp(boost.pred))^2)
 
 RssBoost
-
-
 
 boostN.fit <- gbm(nuvirdi ~ ., data = datN.train, distribution = "gaussian",
                   n.trees = 1000, shrinkage =bestLamN )
@@ -459,7 +456,6 @@ RssBoostN
 
 
 ```{r}
-library(knitr)
 linear_summary <- c(RssLin,RssLinN) 
 lasso_summary <- c(RssLasso,RssLassoN) 
 boost_summary <- c(RssBoost,RssBoostN) 
@@ -487,7 +483,7 @@ undir = dat$undirmatssvaedi
 dat$matssvaedi = NULL
 dat$undirmatssvaedi = NULL
 
-area = levels(data$svfn)[c(1,2,5)]
+area = levels(data$svfn)[c(2,3,5)]
 dat = dat[which(data$svfn %in% area),]
 dat$svfn = droplevels(dat$svfn)
 ```
@@ -570,7 +566,7 @@ RFNor = ggplot(data=data.frame(x=mtrys,y=errN),aes(x=x,y=y))+
 grid.arrange(RFlog,RFNor,ncol=2)
 ```
 
-Here we can see the corresponding Missclassification Error for different values of m.
+Here we can see the corresponding Missclassification Error for different values of m. Let's fit a model with m that gives the lowest misclassification errror.
 
 
 ```{r}
@@ -612,7 +608,6 @@ Here we use SVM without a kernel and with radial kernel to try and classify. The
 
 
 ```{r}
-library(e1071)
 set.seed(5040)
 
 tune.svm = tune(svm, svfn~.,
@@ -636,7 +631,7 @@ Here we can see that $C=300$ gives the best result for both data sets. Let's fit
 fit.svm = svm(svfn~.,
               data = dat.train,
               scale = T,
-              cost = 300)
+              cost = 100)
 pred.svm = predict(fit.svm,dat.test)
 err.svm = mean(pred.svm!=dat.test$svfn)
 err.svm
@@ -667,14 +662,14 @@ tune.svm2 = tune(svm, svfn~.,
                 data = dat.val,
                 scale=T,
                 kernel="radial",
-                ranges = list(gamma=c(0.1,0.5),cost = c(50,100,200,300))) 
+                ranges = list(gamma=c(0.05,0.1,0.5),cost = c(50,100,200,300))) 
 summary(tune.svm2)
 
 tuneN.svm2 = tune(svm, svfn~.,
                 data = datN.val,
                 scale=T,
                 kernel="radial",
-                ranges = list(gamma=c(0.1,0.5),cost = c(50,100,200,300))) 
+                ranges = list(gamma=c(0.05,0.1,0.5),cost = c(50,100,200,300))) 
 summary(tuneN.svm2)
 
 ```

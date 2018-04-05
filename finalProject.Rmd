@@ -549,7 +549,6 @@ for(i in mtrys){
   fitN.rf = randomForest(svfn~., datN.train, mtry = i, ntree = 200)
   predN.rf = predict(fitN.rf, datN.val)
   errN[i-1] = mean(datN.val$svfn != predN.rf)  
-  print(i)
 }
 
 RFlog = ggplot(data=data.frame(x=mtrys,y=err),aes(x=x,y=y))+

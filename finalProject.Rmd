@@ -10,6 +10,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
+options(scipen=999)
 ```
 
 ```{r, warning = F, message = F}
@@ -337,7 +338,7 @@ LevPlot <- ggplot(diagnost, aes(x=seq(1:length(.hat)),y=.hat))+
 LevPlot
 ```
 
-Here we can see the Leverage plot. There seems to be few points that have very high leverage. These point should be looked at more closely to examine weather they are outliers or not.
+Here we can see the Leverage plot. There seems to be few points that have very high leverage. These points should be looked at more closely to examine weather they are outliers or not.
 
 
 ## Lasso Regression
@@ -363,7 +364,7 @@ pred.lasso = predict(fit.lasso,Xtest,s=best.lambda)
 RssLasso = mean((exp(dat.test$nuvirdi)-exp(pred.lasso))^2)
 ```
 
-The best $\lambda$ is `r best.lambda` which is very small so there is not much penalty on the size of coefficients. The corresponding MSE is`r RssLasso` which is much higher than we got for linear regression. 
+The best $\lambda$ is `r best.lambda` which is very small so there is not much penalty on the size of coefficients. The corresponding MSE is `r RssLasso` which is much higher than we got for linear regression. 
 
 
 ```{r,eval = T}
@@ -575,7 +576,7 @@ minErr = which.min(err)
 minErrN = which.min(errN)
 ```
 
-The lowest error for the log-scaled data is at $m = $ `r minErr` and at $m = $ `r minErrN` for the normal data. 
+The lowest error for the log-scaled data is at $m =$ `r minErr` and at $m =$ `r minErrN` for the normal data. 
 
 ```{r}
 fit.rf = randomForest(svfn~., dat.train, mtry =minErr+1, ntree = 200)
@@ -746,6 +747,7 @@ colnames(table) <- c("Missclassification error(Log)","Misclassification error(No
 kable(round(table,6),caption = "Summary of MisClas error from the methods")
 ```
 
+Random Forest has the lowest misclassification error by far for both the normal data and the transformed data. SVM with a radial kernel does slightly better than the one without a kernel. 
 
 ### Appendix
 

@@ -288,7 +288,7 @@ predN.lm = predict(fitN.lm, datN.test)
 RssLinN = mean((datN.test$nuvirdi - predN.lm)^2)
 ```
 
-The MSE for the first model is `r RssLin` and `r RssLinN` for the second model. THerefore it's clear that a log transformation is suitable when performing linear regression on this data.
+The MSE for the first model is `r RssLin` and `r RssLinN` for the second model. Therefore it's clear that a log transformation is suitable when performing linear regression on this data.
 
 # Diagnostics of linear regression
 
@@ -575,7 +575,7 @@ minErr = which.min(err)
 minErrN = which.min(errN)
 ```
 
-The lowest error for the log-scaled data is at $m = $`r minErr` and at $m = $`r minErrN` for the normal data. 
+The lowest error for the log-scaled data is at $m = $ `r minErr` and at $m = $ `r minErrN` for the normal data. 
 
 ```{r}
 fit.rf = randomForest(svfn~., dat.train, mtry =minErr+1, ntree = 200)

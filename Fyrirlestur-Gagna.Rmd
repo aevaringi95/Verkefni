@@ -1,0 +1,244 @@
+---
+title: "Final project"
+subtitle: "Iceland housing data analysis"
+author: "Rakel María Brynjólfsdóttir"
+date: "4/5/2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+rm(list = ls())
+```
+
+```{r, echo = F,warning = F,message = F}
+library(plyr); library(dplyr); library(lubridate)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+library(glmnet)
+library(e1071)
+library(randomForest)
+library(knitr)
+library(gbm)
+library(corrplot)
+```
+
+## Data preprocessing
+
+- The data consists of about 40 000 properties sold in Iceland from 2008-2017
+- We used only properties in the capital region
+- We used 5 levels of the $\texttt{teg_eign}$ variable
+- Combined levels for many of the factors and dropped those with few observations
+- Changed $\texttt{kdagur}$ to days since bought
+- Changed $\texttt{byggar}$ to age of house in years
+- Removed redundant variables
+
+## Descriptive plots
+
+```{r, echo = F}
+data = read.csv("MyData.csv",sep = ",")
+data$fjmib = as.factor(data$fjmib)
+data$lyfta = as.factor(data$lyfta)
+data$fjhaed = as.factor(data$fjhaed)
+data$fjbkar = as.factor(data$fjbkar)
+data$fjsturt = as.factor(data$fjsturt)
+data$fjklos = as.factor(data$fjklos)
+data$fjeld = as.factor(data$fjeld)
+data$fjherb = as.factor(data$fjherb)
+data$fjstof = as.factor(data$fjstof)
+data$matssvaedi = as.factor(data$matssvaedi)
+data$undirmatssvaedi = as.factor(data$undirmatssvaedi)
+data$ibteg = as.factor(data$ibteg)
+
+
+density1 <- ggplot(data,aes(nuvirdi))+
+ geom_density(fill = "palegreen2", alpha = 0.4) 
+
+density2 <- ggplot(data,aes(log(nuvirdi)))+
+  geom_density(fill = "skyblue", alpha = 0.4)
+
+grid.arrange(density1,density2,nrow=2)
+data$nuvirdi = log(data$nuvirdi)
+```
+
+
+## Transformations - ibm2
+
+```{r}
+p1 <- ggplot(data, aes(x=ibm2,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey()
+
+p2 <- ggplot(data, aes(x=log(ibm2),y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey() + labs(x="log(ibm2)")
+
+grid.arrange(p1,p2,nrow = 1)
+data$ibm2 = log(data$ibm2)
+```
+
+## Transformations - geymm2
+
+```{r}
+p1 <- ggplot(data, aes(x=geymm2,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey()
+G = data$geymm2
+ind3 = which(G == 0)
+G[-ind3] = log(G[-ind3])
+G[-ind3] = G[-ind3] + 1.7
+data$geymm2 = G
+
+p2 <- ggplot(data, aes(x=geymm2,y=nuvirdi)) +
+          geom_point(size=0.5) +
+          theme_grey() + labs(x="log(geymm2)")
+
+grid.arrange(p1,p2,nrow = 2)
+```
+
+For all methods we predicted on both the log-transformed data and the untransformed data. 
+
+## Correlation plot
+
+```{r,echo = F}
+X = with(data,cbind(kdagur,aldur,ummal,ibm2,stig10,bilskurm2,svalm2,geymm2))
+corrplot(cor(X),method = "shade")
+```
+
+
+
+## Methods
+
+We used the following methods to predict $\texttt{nuvirdi}$:
+
+- Linear Regression
+- Lasso Regression
+- Boosting
+
+and MSE=$\frac{1}{n}\sum_{i= 1}^n(y_i-\hat{y}_i)^2$ to compare methods. 
+
+For classification of the $\texttt{svfn}$ variable we used: 
+
+- Random Forests
+- Support Vector Machine
+
+and compared them with misclassification error. 
+
+When predicting $\texttt{nuvirdi}$ we used the $\texttt{matssvaedi}$ variables and removed $\texttt{svfn}$ and when classifying $\texttt{svfn}$ we removed the $\texttt{matssvaedi}$ variables.
+
+## Linear Regression
+
+- Here we estimate $\beta_0, \beta_1,\dots,\beta_p$ as the values that minimize $$\text{RSS}=\sum_{i = 1}^n(y_i-\hat{y}_i)^2$$
+
+- The results were:  
+
+ Statistic  | Log-data | Normal data
+----------- | ---------- | ------------
+ $R_{adj}^2$| 0.9086     | 0.8598
+ MSE        | 29136614   | 34703492
+ 
+```{r,echo = F, fig.height=3, fig.width=5, fig.align="left"}
+dat = data
+svfn = dat$svfn
+dat$svfn = NULL
+set.seed(5040)
+n = dim(dat)[1]
+train = sample(n,floor(n*0.8)) 
+dat.train = dat[train,]
+dat.test = dat[-train,]
+fit.lm = lm(nuvirdi~.,dat.train)
+diagnost = fortify(fit.lm)
+diagnost$.index = 1:(dim(diagnost)[1])
+res_sd = sd(diagnost$.resid)
+resPlot = ggplot(diagnost, aes(x=seq(1:length(.resid)),y=.resid)) +
+                geom_point()+
+                geom_hline(yintercept=0, col="red", linetype="dashed")+
+                geom_hline(yintercept=2*res_sd, col="blue", linetype="dashed")+
+                geom_hline(yintercept=-2*res_sd, col="blue", linetype="dashed")+
+                geom_hline(yintercept=3*res_sd, col="green", linetype="dashed")+
+                geom_hline(yintercept=-3*res_sd, col="green", linetype="dashed")+
+                xlab("Index")+ylab("Residuals")+labs(title = "Index plot of residuals")+
+                theme_grey()
+resPlot
+```
+ 
+## Lasso Regression
+
+- Now we want to minimise $$\text{RSS} + \lambda\sum_{j = 1}^p | \beta_j |$$ so we penalize the size of the coefficients which may cause some of them to become zero. 
+- Transformed data: We tuned $\lambda$ and got a value of $8.7084\times 10^{-16}$ and an MSE of 54941789. 
+- Untransformed data: Here we got $\lambda = 9.5275$ and MSE = 56216154.
+- The coefficients for $\texttt{fjeld}$ and $\texttt{svalm2}$ become zero. 
+
+## Boosting 
+
+- Boosting involves growing decision trees sequentially such that each tree is grown using information from previously grown trees. 
+- Transformed data: We tuned $\lambda$ and got a value of $0.33$ and MSE = 27786447. 
+- Untransformed data: Here we got $\lambda = 0.15$ and MSE = 36111501.
+
+
+$\textbf{Summary}:$ 
+
+ Method       | MSE (log)      | MSE (normal)
+------------- | -------------- | ------------
+Linear        | 29136614       | 34703492
+ Lasso        | 54941789       | 56216153
+ Boosting     | 27786447       | 36111501
+ 
+[Afhverju er Lasso svona lélegt? ]
+
+
+## Classification - Random Forest
+
+- Classified only three levels of the $\texttt{svfn}$ variable: Rvk, Kop, Hfj. 
+- [Lýsing á random forest]
+- $m$ parameter: number of predictors used for each split in the trees
+- Transformed data: We tuned $m$ and got a value of 12, the missclassification error was $10.83$%. 
+- Untransformed data: We tuned $m$ and got a value of 14, the missclassification error was $10.89$%.
+
+class | Hfj   | Kop  | Rvk
+------| ----- | ---- | -----
+Hfj   | 1701  | 149  | 658
+Kop   | 103   | 2447 | 540
+Rvk   | 134   | 231  | 10079
+
+- Most important variables:  $\texttt{aldur}$, $\texttt{ummal}$ and $\texttt{ibm2}$
+
+## Support Vector Machine - w/o kernel
+
+
+- We got $C = 100$ for both data sets. 
+- Transformed data missclassification error: $23$%.
+- Untransformed data missclassification error: $23.23$%. 
+
+class | Hfj   | Kop  | Rvk
+------| ----- | ---- | -----
+Hfj   | 319  | 48  | 97
+Kop   | 95   | 545 | 180
+Rvk   | 329   | 404  | 2997
+
+## Support Vector Machine - radial kernel
+
+- Here we got $C = 300$ and $\gamma = 0.1$ for both data sets. 
+- Transformed data missclassification error: $21.04$%.
+- Untransformed data missclassification error: $20.96$%. 
+- Here the error is slightly lower for the untransformed data. 
+
+class | Hfj   | Kop  | Rvk
+------| ----- | ---- | -----
+Hfj   | 438  | 68  | 158
+Kop   | 71   | 629 | 224
+Rvk   | 234   | 300  | 2892
+
+##
+
+$\textbf{Summary:}$
+
+ Method            | MisClass (log) | MisClass (normal)
+------------------ | -------------- | ------------
+Random Forest      | 10.83%         | 10.9%
+SVM wo kernel      | 23%            | 23.23%
+SVM radial kernel  | 21.04%         | 20.96%
+
+[Afhverju er RF best?]
+ 

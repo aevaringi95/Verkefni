@@ -1,7 +1,7 @@
 ---
 title: "Final project"
 subtitle: "Iceland housing data analysis"
-author: "Rakel María Brynjólfsdóttir"
+author: "Ævar Ingi Jóhannesson and Rakel María Brynjólfsdóttir"
 date: "4/5/2018"
 output: slidy_presentation
 ---

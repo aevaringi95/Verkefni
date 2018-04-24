@@ -1,7 +1,7 @@
 ---
 title: "Final project"
 subtitle: "Iceland housing data analysis"
-author: "Rakel María Brynjólfsdóttir og Ævar ingi Jóhannesson"
+author: "Rakel María Brynjólfsdóttir"
 date: "4/5/2018"
 output: slidy_presentation
 ---
@@ -185,14 +185,12 @@ Linear        | 29136614       | 34703492
  Lasso        | 54941789       | 56216153
  Boosting     | 27786447       | 36111501
  
-[Afhverju er Lasso svona lélegt? ]
 
 
 ## Classification - Random Forest
 
 - Classified only three levels of the $\texttt{svfn}$ variable: Rvk, Kop, Hfj. 
-- Random forest uses bootstrap to grow many trees and uses m number of predictors for each split.
-- Used grid search and validation set to tune m.
+- [Lýsing á random forest]
 - $m$ parameter: number of predictors used for each split in the trees
 - Transformed data: We tuned $m$ and got a value of 12, the missclassification error was $10.83$%. 
 - Untransformed data: We tuned $m$ and got a value of 14, the missclassification error was $10.89$%.
@@ -241,4 +239,4 @@ Random Forest      | 10.83%         | 10.9%
 SVM wo kernel      | 23%            | 23.23%
 SVM radial kernel  | 21.04%         | 20.96%
 
--SVM uses one-against-one and works best with only 2-classes. It seem's that it's not working well here.
+

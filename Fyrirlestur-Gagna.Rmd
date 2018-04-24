@@ -167,8 +167,9 @@ resPlot
 
 - Now we want to minimise $$\text{RSS} + \lambda\sum_{j = 1}^p | \beta_j |$$ so we penalize the size of the coefficients which may cause some of them to become zero. 
 - Transformed data: We tuned $\lambda$ and got a value of $8.7084\times 10^{-16}$ and an MSE of 54941789. 
-- Untransformed data: Here we got $\lambda = 9.5275$ and MSE = 56216154.
 - The coefficients for $\texttt{fjeld}$ and $\texttt{svalm2}$ become zero. 
+- Untransformed data: Here we got $\lambda = 9.5275$ and MSE = 56216154.
+
 
 ## Boosting 
 

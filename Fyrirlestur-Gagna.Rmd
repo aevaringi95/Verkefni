@@ -190,7 +190,8 @@ Linear        | 29136614       | 34703492
 ## Classification - Random Forest
 
 - Classified only three levels of the $\texttt{svfn}$ variable: Rvk, Kop, Hfj. 
-- [Lýsing á random forest]
+- Random forest uses bootstrap to grow many trees and uses m number of predictors for each split.
+- Used grid search and validation set to tune m.
 - $m$ parameter: number of predictors used for each split in the trees
 - Transformed data: We tuned $m$ and got a value of 12, the missclassification error was $10.83$%. 
 - Untransformed data: We tuned $m$ and got a value of 14, the missclassification error was $10.89$%.
